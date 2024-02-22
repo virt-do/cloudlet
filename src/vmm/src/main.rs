@@ -1,6 +1,6 @@
 use crate::args::CliArguments;
 use clap::Parser;
-use tracing::{info, level_filters};
+use tracing::info;
 use vmm::core::{self, vmm::VMM};
 
 mod args;
@@ -16,16 +16,8 @@ pub enum Error {
 fn main() -> Result<(), Error> {
     // Parse the configuration and configure logger verbosity
     let args = CliArguments::parse();
-
     tracing_subscriber::fmt()
-        .with_max_level(match args.verbose.log_level_filter() {
-            log::LevelFilter::Off => level_filters::LevelFilter::OFF,
-            log::LevelFilter::Error => level_filters::LevelFilter::ERROR,
-            log::LevelFilter::Warn => level_filters::LevelFilter::WARN,
-            log::LevelFilter::Info => level_filters::LevelFilter::INFO,
-            log::LevelFilter::Debug => level_filters::LevelFilter::DEBUG,
-            log::LevelFilter::Trace => level_filters::LevelFilter::TRACE,
-        })
+        .with_max_level(args.convert_log_to_tracing())
         .init();
 
     info!(

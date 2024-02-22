@@ -1,0 +1,11 @@
+name: Push & PR to the main branch
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint_rust:
+    name: Lint the Rust packages
+    uses: ./.github/workflows/flow_lint_rust.yml
