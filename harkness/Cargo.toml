@@ -1,0 +1,22 @@
+[package]
+name = "harkness"
+description = "The Virtual Machine Manager for the Harkness serverless runtime"
+authors = ["Polytech Montpellier DevOps - 2022/2025"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/virt-do/project-2024"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76.0"
+
+[dependencies]
+clap = { version = "4.5.1", features = ["derive", "env"] }
+clap-verbosity-flag = "2.2.0"
+harkness-vmm = { path = "src/vmm" }
+log = "0.4.20"
+tracing = "0.1.40"
+tracing-log = "0.2.0"
+tracing-subscriber = "0.3.18"
+
+[workspace]
+members = ["src/vmm"]
