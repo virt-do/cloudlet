@@ -1,0 +1,16 @@
+name: CI Scheduler
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint_rust:
+    name: Lint the "${{ matrix.package }}" package
+    uses: ./.github/workflows/flow_lint_rust.yml
+    strategy:
+      matrix:
+        package: [harkness]
+    with:
+      directory: ${{ matrix.package }}
