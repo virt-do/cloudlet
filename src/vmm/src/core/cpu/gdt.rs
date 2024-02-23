@@ -8,9 +8,8 @@
 // For GDT details see arch/x86/include/asm/segment.h
 
 use kvm_bindings::kvm_segment;
-use vm_memory::{Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
-
 use std::mem;
+use vm_memory::{Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
 
 pub const BOOT_GDT_OFFSET: u64 = 0x500;
 pub const BOOT_IDT_OFFSET: u64 = 0x520;

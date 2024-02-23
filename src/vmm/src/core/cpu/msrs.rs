@@ -5,7 +5,7 @@ use std::default::Default;
 
 use kvm_bindings::{kvm_msr_entry, Msrs};
 
-use crate::cpu::msr_index::{
+use crate::core::cpu::msr_index::{
     MSR_CSTAR, MSR_IA32_MISC_ENABLE, MSR_IA32_MISC_ENABLE_FAST_STRING, MSR_IA32_SYSENTER_CS,
     MSR_IA32_SYSENTER_EIP, MSR_IA32_SYSENTER_ESP, MSR_IA32_TSC, MSR_KERNEL_GS_BASE, MSR_LSTAR,
     MSR_STAR, MSR_SYSCALL_MASK,
@@ -17,6 +17,7 @@ pub enum Error {
     /// Failed to initialize MSRS.
     CreateMsrs,
 }
+
 /// Specialized result type for operations on MSRs.
 pub type Result<T> = std::result::Result<T, Error>;
 

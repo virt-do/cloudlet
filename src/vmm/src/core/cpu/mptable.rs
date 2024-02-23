@@ -5,15 +5,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 
+use crate::core::cpu::mpspec;
+use libc::c_char;
 use std::mem;
 use std::result;
 use std::slice;
-
-use libc::c_char;
-
 use vm_memory::{Address, ByteValued, Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
-
-use crate::cpu::mpspec;
 
 // This is a workaround to the Rust enforcement specifying that any implementation of a foreign
 // trait (in this case `ByteValued`) where:

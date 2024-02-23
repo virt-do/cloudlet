@@ -1,18 +1,16 @@
 // Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
 
+use crate::core::devices::serial::{LumperSerial, SERIAL_PORT_BASE, SERIAL_PORT_LAST_REGISTER};
+use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
+use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
 use std::convert::TryInto;
 use std::io;
 use std::sync::{Arc, Mutex};
 use std::{result, u64};
-
-use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
-use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
 use tracing::{event, Level};
 use vm_memory::{Address, Bytes, GuestAddress, GuestMemoryError, GuestMemoryMmap};
 use vmm_sys_util::terminal::Terminal;
-
-use crate::devices::serial::{LumperSerial, SERIAL_PORT_BASE, SERIAL_PORT_LAST_REGISTER};
 
 pub(crate) mod cpuid;
 mod gdt;
@@ -111,7 +109,7 @@ impl Vcpu {
             // Starting stack pointer.
             rbp: BOOT_STACK_POINTER,
             // Must point to zero page address per Linux ABI. This is x86_64 specific.
-            rsi: crate::kernel::ZEROPG_START,
+            rsi: crate::core::kernel::ZEROPG_START,
             ..Default::default()
         };
         self.vcpu_fd.set_regs(&regs).map_err(Error::KvmIoctl)

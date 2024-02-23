@@ -1,17 +1,15 @@
-use clap::Parser;
-use harkness_vmm::VMM;
-use tracing::{event, Level};
-use tracing_log::AsTrace;
-
 use crate::args::CliArguments;
+use clap::Parser;
+use tracing::{info, Level};
+use vmm::core::{self, vmm::VMM};
 
 mod args;
 
 #[derive(Debug)]
 pub enum Error {
-    VmmNew(harkness_vmm::Error),
-    VmmConfigure(harkness_vmm::Error),
-    VmmRun(harkness_vmm::Error),
+    VmmNew(core::Error),
+    VmmConfigure(core::Error),
+    VmmRun(core::Error),
 }
 
 /// The application entry point.
@@ -20,23 +18,18 @@ fn main() -> Result<(), Error> {
     let args = CliArguments::parse();
 
     tracing_subscriber::fmt()
-        .with_max_level(args.verbose.log_level_filter().as_trace())
+        .with_max_level(Level::DEBUG)
         .init();
 
-    event!(
-        Level::INFO,
+    info!(
         app_name = env!("CARGO_PKG_NAME"),
         app_version = env!("CARGO_PKG_VERSION"),
-        "Starting application"
+        "Starting application",
     );
 
     // Create a new VMM
     let mut vmm = VMM::new().map_err(Error::VmmNew)?;
 
-    // Configure the VMM:
-    // * Number of virtual CPUs
-    // * Memory size (in MB)
-    // * Path to a Linux kernel
     vmm.configure(args.cpus, args.memory, &args.kernel)
         .map_err(Error::VmmConfigure)?;
 

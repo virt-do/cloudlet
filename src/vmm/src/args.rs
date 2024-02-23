@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
-// The Virtual Machine Manager for the Harkness serverless runtime.
+/// The Virtual Machine Manager for the Cloudlet serverless runtime.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct CliArguments {

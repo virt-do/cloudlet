@@ -2,17 +2,15 @@
 
 #![cfg(target_arch = "x86_64")]
 
-use std::fs::File;
-use std::path::PathBuf;
-use std::result;
-
+use crate::core::{Error, Result};
 use linux_loader::bootparam::boot_params;
 use linux_loader::cmdline::Cmdline;
 use linux_loader::configurator::{linux::LinuxBootConfigurator, BootConfigurator, BootParams};
 use linux_loader::loader::{elf::Elf, load_cmdline, KernelLoader, KernelLoaderResult};
+use std::fs::File;
+use std::path::PathBuf;
+use std::result;
 use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap};
-
-use crate::{Error, Result};
 
 // x86_64 boot constants. See https://www.kernel.org/doc/Documentation/x86/boot.txt for the full
 // documentation.

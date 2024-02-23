@@ -1,73 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
 
-#![cfg(target_arch = "x86_64")]
-
-extern crate libc;
-
-extern crate linux_loader;
-extern crate vm_memory;
-extern crate vm_superio;
-
+use crate::core::cpu::{self, cpuid, mptable, Vcpu};
+use crate::core::devices::serial::LumperSerial;
+use crate::core::epoll_context::{EpollContext, EPOLL_EVENTS_LEN};
+use crate::core::kernel;
+use crate::core::{Error, Result};
+use kvm_bindings::{kvm_userspace_memory_region, KVM_MAX_CPUID_ENTRIES};
+use kvm_ioctls::{Kvm, VmFd};
+use linux_loader::loader::KernelLoaderResult;
 use std::io;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
-
-use kvm_bindings::{kvm_userspace_memory_region, KVM_MAX_CPUID_ENTRIES};
-use kvm_ioctls::{Kvm, VmFd};
-use linux_loader::loader::{self, KernelLoaderResult};
 use tracing::{event, Level};
 use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
 use vmm_sys_util::terminal::Terminal;
-
-mod cpu;
-use cpu::{cpuid, mptable, Vcpu};
-mod devices;
-use devices::serial::LumperSerial;
-mod epoll_context;
-use epoll_context::{EpollContext, EPOLL_EVENTS_LEN};
-mod kernel;
-
-#[derive(Debug)]
-
-/// VMM errors.
-pub enum Error {
-    /// Failed to write boot parameters to guest memory.
-    BootConfigure(linux_loader::configurator::Error),
-    /// Error configuring the kernel command line.
-    Cmdline(linux_loader::cmdline::Error),
-    /// Failed to load kernel.
-    KernelLoad(loader::Error),
-    /// Invalid E820 configuration.
-    E820Configuration,
-    /// Highmem start address is past the guest memory end.
-    HimemStartPastMemEnd,
-    /// I/O error.
-    IO(io::Error),
-    /// Error issuing an ioctl to KVM.
-    KvmIoctl(kvm_ioctls::Error),
-    /// vCPU errors.
-    Vcpu(cpu::Error),
-    /// Memory error.
-    Memory(vm_memory::Error),
-    /// Serial creation error
-    SerialCreation(io::Error),
-    /// IRQ registration error
-    IrqRegister(io::Error),
-    /// epoll creation error
-    EpollError(io::Error),
-    /// STDIN read error
-    StdinRead(kvm_ioctls::Error),
-    /// STDIN write error
-    StdinWrite(vm_superio::serial::Error<io::Error>),
-    /// Terminal configuration error
-    TerminalConfigure(kvm_ioctls::Error),
-}
-
-/// Dedicated [`Result`](https://doc.rust-lang.org/std/result/) type.
-pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct VMM {
     vm_fd: VmFd,
@@ -106,7 +55,7 @@ impl VMM {
         Ok(vmm)
     }
 
-    pub fn configure_memory(&mut self, mem_size_mb: u32) -> Result<()> {
+    fn configure_memory(&mut self, mem_size_mb: u32) -> Result<()> {
         // Convert memory size from MBytes to bytes.
         let mem_size = ((mem_size_mb as u64) << 20) as usize;
 
@@ -139,7 +88,7 @@ impl VMM {
         Ok(())
     }
 
-    pub fn configure_io(&mut self) -> Result<()> {
+    fn configure_io(&mut self) -> Result<()> {
         // First, create the irqchip.
         // On `x86_64`, this _must_ be created _before_ the vCPUs.
         // It sets up the virtual IOAPIC, virtual PIC, and sets up the future vCPUs for local APIC.
@@ -162,11 +111,7 @@ impl VMM {
         Ok(())
     }
 
-    pub fn configure_vcpus(
-        &mut self,
-        num_vcpus: u8,
-        kernel_load: KernelLoaderResult,
-    ) -> Result<()> {
+    fn configure_vcpus(&mut self, num_vcpus: u8, kernel_load: KernelLoaderResult) -> Result<()> {
         mptable::setup_mptable(&self.guest_memory, num_vcpus)
             .map_err(|e| Error::Vcpu(cpu::Error::Mptable(e)))?;
 
@@ -208,7 +153,7 @@ impl VMM {
         Ok(())
     }
 
-    // Run all virtual CPUs.
+    /// Run all virtual CPUs.
     pub fn run(&mut self) -> Result<()> {
         for mut vcpu in self.vcpus.drain(..) {
             event!(Level::INFO, vcpu_index = vcpu.index, "Starting vCPU");
@@ -249,6 +194,10 @@ impl VMM {
         }
     }
 
+    /// Configure the VMM:
+    /// * `num_vcpus` Number of virtual CPUs
+    /// * `mem_size_mb` Memory size (in MB)
+    /// * `kernel_path` Path to a Linux kernel
     pub fn configure(&mut self, num_vcpus: u8, mem_size_mb: u32, kernel_path: &Path) -> Result<()> {
         self.configure_memory(mem_size_mb)?;
         let kernel_load = kernel::kernel_setup(&self.guest_memory, kernel_path.to_path_buf())?;
