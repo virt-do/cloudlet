@@ -11,6 +11,6 @@ jobs:
     uses: ./.github/workflows/flow_lint_rust.yml
     strategy:
       matrix:
-        package: [harkness]
+        package: ["src/vmm"]
     with:
       directory: ${{ matrix.package }}
