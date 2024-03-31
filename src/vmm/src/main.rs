@@ -27,7 +27,8 @@ fn main() -> Result<(), Error> {
     );
 
     // Create a new VMM
-    let mut vmm = VMM::new().map_err(Error::VmmNew)?;
+    let mut vmm =
+        VMM::new(args.network_host_ip, args.network_host_netmask).map_err(Error::VmmNew)?;
 
     vmm.configure(args.cpus, args.memory, &args.kernel)
         .map_err(Error::VmmConfigure)?;
