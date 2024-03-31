@@ -1,5 +1,5 @@
 //! Command-line arguments.
-use std::path::PathBuf;
+use std::{net::Ipv4Addr, path::PathBuf};
 
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
@@ -20,6 +20,14 @@ pub struct CliArguments {
     /// Memory amount (in MBytes) assigned to the guest.
     #[clap(short, long, env, default_value = "512")]
     pub memory: u32,
+
+    /// IPv4 address of the host tap interface.
+    #[clap(long, env)]
+    pub network_host_ip: Ipv4Addr,
+
+    /// Subnet mask of the host tap interface.
+    #[clap(long, env)]
+    pub network_host_netmask: Ipv4Addr,
 
     /// Verbosity level.
     #[command(flatten)]
