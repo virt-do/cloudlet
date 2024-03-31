@@ -5,8 +5,8 @@ use crate::core::devices::serial::{LumperSerial, SERIAL_PORT_BASE, SERIAL_PORT_L
 use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
 use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
 use std::convert::TryInto;
-use std::io;
 use std::sync::{Arc, Mutex};
+use std::{io, process};
 use std::{result, u64};
 use tracing::{error, info, warn};
 use vm_memory::{Address, Bytes, GuestAddress, GuestMemoryError, GuestMemoryMmap};
@@ -33,6 +33,9 @@ const PDE_START: u64 = 0xb000;
 const X86_CR0_PE: u64 = 0x1;
 const X86_CR0_PG: u64 = 0x8000_0000;
 const X86_CR4_PAE: u64 = 0x20;
+
+const KBD_CMD_IO_ADDR: u16 = 0x64;
+const KBD_RESET_CMD: u8 = 0xFE;
 
 /// Errors encountered during vCPU operation.
 #[derive(Debug)]
@@ -245,6 +248,12 @@ impl Vcpu {
                                 data[0],
                             )
                             .unwrap();
+                    }
+                    KBD_CMD_IO_ADDR => {
+                        if data[0] == KBD_RESET_CMD {
+                            info!(?exit_reason, "Guest reset via keyboard controller. Bye!");
+                            process::exit(0);
+                        }
                     }
                     _ => {
                         warn!(address = addr, "Unsupported device write at {:x?}", addr);
