@@ -1,7 +1,6 @@
 use actix_web::{App, HttpServer};
 use api::services::{configuration, logs, metrics, run, shutdown};
 
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let port = 3000;
