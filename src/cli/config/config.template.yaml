@@ -1,0 +1,4 @@
+language: rust
+env_path: .env
+code_path: src
+log_level: debug
