@@ -43,9 +43,11 @@ pub struct AgentConfig {
 impl AgentConfig {
     pub fn new_from_file(file_path: &PathBuf) -> AgentResult<Self> {
         let config = std::fs::read_to_string(file_path).map_err(AgentError::OpenConfigFileError)?;
-        let mut config: AgentConfig = toml::from_str(&config).map_err(AgentError::ParseConfigError)?;
+        let mut config: AgentConfig =
+            toml::from_str(&config).map_err(AgentError::ParseConfigError)?;
 
-        let config_string = std::fs::read_to_string(file_path).map_err(AgentError::OpenConfigFileError)?;
+        let config_string =
+            std::fs::read_to_string(file_path).map_err(AgentError::OpenConfigFileError)?;
 
         config.config_string = config_string;
 

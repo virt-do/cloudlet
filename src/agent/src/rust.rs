@@ -58,22 +58,30 @@ impl Agent for RustAgent {
     fn prepare(&self) -> AgentResult<()> {
         let code = std::fs::read_to_string(&self.rust_config.build.source_code_path).unwrap();
 
-        let function_dir = format!("/tmp/{}", Alphanumeric.sample_string(&mut rand::thread_rng(), 16));
+        let function_dir = format!(
+            "/tmp/{}",
+            Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+        );
 
         println!("Function directory: {}", function_dir);
 
         create_dir_all(format!("{}/src", &function_dir)).expect("Unable to create directory");
 
-        std::fs::write(format!("{}/src/main.rs", &function_dir), code).expect("Unable to write main.rs file");
-    
-        let cargo_toml = format!(r#"
+        std::fs::write(format!("{}/src/main.rs", &function_dir), code)
+            .expect("Unable to write main.rs file");
+
+        let cargo_toml = format!(
+            r#"
             [package]
             name = "{}"
             version = "0.1.0"
             edition = "2018"
-        "#, self.agent_config.workload_name);
+        "#,
+            self.agent_config.workload_name
+        );
 
-        std::fs::write(format!("{}/Cargo.toml",&function_dir), cargo_toml).expect("Unable to write Cargo.toml file");
+        std::fs::write(format!("{}/Cargo.toml", &function_dir), cargo_toml)
+            .expect("Unable to write Cargo.toml file");
 
         let result = self.build(&function_dir)?;
 
@@ -81,11 +89,21 @@ impl Agent for RustAgent {
 
         // Copy the binary to /tmp, we could imagine a more complex scenario where we would put this in an artifact repository (like S3)
         let binary_path = match self.rust_config.build.release {
-            true => format!("{}/target/release/{}", &function_dir, self.agent_config.workload_name),
-            false => format!("{}/target/debug/{}", &function_dir, self.agent_config.workload_name),
+            true => format!(
+                "{}/target/release/{}",
+                &function_dir, self.agent_config.workload_name
+            ),
+            false => format!(
+                "{}/target/debug/{}",
+                &function_dir, self.agent_config.workload_name
+            ),
         };
 
-        std::fs::copy(binary_path, format!("/tmp/{}", self.agent_config.workload_name)).expect("Unable to copy binary");
+        std::fs::copy(
+            binary_path,
+            format!("/tmp/{}", self.agent_config.workload_name),
+        )
+        .expect("Unable to copy binary");
 
         std::fs::remove_dir_all(&function_dir).expect("Unable to remove directory");
 

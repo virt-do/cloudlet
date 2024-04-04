@@ -1,5 +1,5 @@
-mod rust;
 mod agent;
+mod rust;
 
 use std::path::PathBuf;
 
@@ -19,10 +19,7 @@ impl AgentRunner {
             _ => panic!("Unsupported language: {}", config.language),
         };
 
-        AgentRunner {
-            config,
-            agent,
-        }
+        AgentRunner { config, agent }
     }
 
     pub fn run(&self) -> AgentResult<()> {
