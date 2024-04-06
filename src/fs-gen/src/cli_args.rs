@@ -1,10 +1,9 @@
 use std::{env, path::PathBuf};
 
-use clap::{command, Parser};
+use clap::{command, error::ErrorKind, CommandFactory, Parser};
 use regex::Regex;
 
 use once_cell::sync::Lazy;
-use validator::Validate;
 
 // So, for any of you who may be scared, this is the regex from the OCI Distribution Sepcification for the image name + the tag
 static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
@@ -12,18 +11,22 @@ static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// Convert an OCI image into a CPIO file
-#[derive(Parser, Debug, Validate)]
+#[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 pub struct CliArgs {
     /// The name of the image to download
-
-    #[arg(short, long)]
-    #[validate(regex(path = *RE_IMAGE_NAME))]
     pub image_name: String,
 
     /// The path to the output file
     #[arg(short, long, default_value=get_default_log_path().into_os_string())]
     pub ouput_file: PathBuf,
+
+    /// The host path to the guest agent binary
+    pub agent_host_path: PathBuf,
+
+    /// The target path of the guest agent binary
+    #[arg(short, long, default_value=get_default_target_agent_path().into_os_string())]
+    pub agent_target_path: PathBuf,
 }
 
 impl CliArgs {
@@ -31,12 +34,35 @@ impl CliArgs {
     pub fn get_args() -> Self {
         let args = CliArgs::parse();
 
-        let validation = args.validate();
-        if validation.is_err() {
-            panic!("Invalid arguments: {}", validation.expect_err("wut"));
-        }
+        args.validate_image();
+        args.validate_host_path();
 
         args
+    }
+
+    fn validate_image(&self) {
+        if !RE_IMAGE_NAME.is_match(&self.image_name) {
+            let mut cmd = CliArgs::command();
+            cmd.error(
+                ErrorKind::InvalidValue,
+                format!("Invalid image name: \"{}\"", self.image_name),
+            )
+            .exit();
+        }
+    }
+
+    fn validate_host_path(&self) {
+        if !self.agent_host_path.exists() {
+            let mut cmd = CliArgs::command();
+            cmd.error(
+                ErrorKind::InvalidValue,
+                format!(
+                    "File not found for agent binary: \"{}\"",
+                    self.agent_host_path.to_string_lossy()
+                ),
+            )
+            .exit();
+        }
     }
 }
 
@@ -46,4 +72,8 @@ fn get_default_log_path() -> PathBuf {
     path.pop();
     path.push("output.cpio");
     path
+}
+
+fn get_default_target_agent_path() -> PathBuf {
+    PathBuf::from("/usr/bin/agent")
 }
