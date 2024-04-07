@@ -1,0 +1,11 @@
+[package]
+name = "serverless_protocol"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "serverless_protocol"
+crate-type = ["cdylib"]
+
+[dependencies]
+serialport = "4.3.0"
