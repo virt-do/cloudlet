@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone)]
 pub enum MessageType {
     Start = 0,
@@ -7,28 +9,38 @@ pub enum MessageType {
     Log = 4,
 }
 
-impl From<u16> for MessageType {
-    fn from(value: u16) -> Self {
+impl TryFrom<u16> for MessageType {
+    type Error = &'static str;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
         match value {
-            0 => MessageType::Start,
-            1 => MessageType::Exit,
-            2 => MessageType::Interrupt,
-            3 => MessageType::Ok,
-            4 => MessageType::Log,
-            // TODO: Handle error
-            _ => panic!("Invalid message type"),
+            0 => Ok(MessageType::Start),
+            1 => Ok(MessageType::Exit),
+            2 => Ok(MessageType::Interrupt),
+            3 => Ok(MessageType::Ok),
+            4 => Ok(MessageType::Log),
+            _ => Err("Invalid message type"),
         }
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Payload {
+    Start(StartMessage),
+    Exit(ExitMessage),
+    Interrupt(InterruptMessage),
+    Ok(OkMessage),
+    Log(LogMessage),
+}
+
 /// Expects OkMessage
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartMessage {
     content: String,
 }
 
 /// Expects OkMessage
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExitMessage {
     code: i32,
     stdin: String,
@@ -36,17 +48,17 @@ pub struct ExitMessage {
 }
 
 /// Expects OkMessage
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterruptMessage {
     signal: i32,
 }
 
 /// Mostly used to answer other messages
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OkMessage {}
 
 /// Expects OkMessage
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogMessage {
     kind: String,
     content: String,

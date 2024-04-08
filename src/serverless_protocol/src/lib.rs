@@ -2,7 +2,7 @@ mod messages;
 
 use std::io::{Read, Write};
 
-use messages::MessageType;
+use messages::{MessageType, Payload};
 use serialport::TTYPort;
 
 const TERMINATOR: u8 = 0xC0;
@@ -15,6 +15,8 @@ pub enum Error {
     IoError(std::io::Error),
     Utf8Error(std::str::Utf8Error),
     ChecksumError,
+    MessageTypeDeserializationError(&'static str),
+    PayloadDeserializationError(serde_json::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -28,25 +30,26 @@ pub struct CloudletProtocol {
 pub struct CloudletMessage {
     pub message_type: MessageType,
     pub checksum: u16,
-    pub payload: String,
+    pub payload: Payload,
 }
 
-pub fn create_checksum(content: &str) -> u16 {
+pub fn create_checksum(payload: &Payload) -> u16 {
     let mut checksum: u16 = 0;
-    for byte in content.as_bytes() {
+    let json_payload = serde_json::to_string(payload).unwrap();
+    for byte in json_payload.as_bytes() {
         checksum = checksum.wrapping_add(*byte as u16);
     }
     checksum
 }
 
 impl CloudletMessage {
-    pub fn new(message_type: MessageType, content: String) -> CloudletMessage {
-        let checksum = create_checksum(&content);
+    pub fn new(message_type: MessageType, payload: Payload) -> CloudletMessage {
+        let checksum = create_checksum(&payload);
 
         CloudletMessage {
             message_type,
             checksum,
-            payload: content,
+            payload,
         }
     }
 }
@@ -91,7 +94,8 @@ impl CloudletProtocol {
         buffer.push((message.checksum >> 8) as u8);
         buffer.push((message.checksum & 0xFF) as u8);
         buffer.push((message.message_type as u16 >> 8) as u8);
-        buffer.extend(message.payload.as_bytes());
+        let json_payload = serde_json::to_string(&message.payload).unwrap();
+        buffer.extend(json_payload.as_bytes());
 
         buffer = CloudletProtocol::escape_buffer(buffer);
 
@@ -139,17 +143,25 @@ impl CloudletProtocol {
 
         let checksum = u16::from_be_bytes([buffer[0], buffer[1]]);
         let message_type = u16::from_be_bytes([buffer[2], buffer[3]]);
-        let message_type = MessageType::from(message_type);
-        let content = String::from_utf8_lossy(&buffer[4..]).into_owned();
+        let message_type = MessageType::try_from(message_type).map_err(Error::MessageTypeDeserializationError)?;
+        let json_payload = String::from_utf8_lossy(&buffer[4..]).into_owned();
 
-        if checksum != create_checksum(&content) {
+        let payload = match message_type {
+            MessageType::Start => Payload::Start(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
+            MessageType::Exit => Payload::Exit(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
+            MessageType::Interrupt => Payload::Interrupt(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
+            MessageType::Ok => Payload::Ok(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
+            MessageType::Log => Payload::Log(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
+        };
+
+        if checksum != create_checksum(&payload) {
             return Err(Error::ChecksumError);
         }
 
         Ok(CloudletMessage {
             message_type,
             checksum,
-            payload: content,
+            payload,
         })
     }
 }
