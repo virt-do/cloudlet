@@ -8,10 +8,13 @@ extern crate vm_superio;
 use linux_loader::loader;
 use std::io;
 
+use self::network::open_tap;
+
 mod cpu;
 mod devices;
 mod epoll_context;
 mod kernel;
+mod network;
 pub mod vmm;
 
 #[derive(Debug)]
@@ -48,6 +51,8 @@ pub enum Error {
     StdinWrite(vm_superio::serial::Error<io::Error>),
     /// Terminal configuration error
     TerminalConfigure(kvm_ioctls::Error),
+    // Tap open error
+    OpenTap(open_tap::Error),
 }
 
 /// Dedicated [`Result`](https://doc.rust-lang.org/std/result/) type.

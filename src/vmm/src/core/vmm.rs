@@ -9,6 +9,7 @@ use kvm_bindings::{kvm_userspace_memory_region, KVM_MAX_CPUID_ENTRIES};
 use kvm_ioctls::{Kvm, VmFd};
 use linux_loader::loader::KernelLoaderResult;
 use std::io;
+use std::net::Ipv4Addr;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
 use std::path::Path;
@@ -18,11 +19,15 @@ use tracing::info;
 use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
 use vmm_sys_util::terminal::Terminal;
 
+use super::network::open_tap::open_tap;
+use super::network::tap::Tap;
+
 pub struct VMM {
     vm_fd: VmFd,
     kvm: Kvm,
     guest_memory: GuestMemoryMmap,
     vcpus: Vec<Vcpu>,
+    _tap: Tap,
 
     serial: Arc<Mutex<LumperSerial>>,
     epoll: EpollContext,
@@ -30,7 +35,7 @@ pub struct VMM {
 
 impl VMM {
     /// Create a new VMM.
-    pub fn new() -> Result<Self> {
+    pub fn new(tap_ip_addr: Ipv4Addr, tap_netmask: Ipv4Addr) -> Result<Self> {
         // Open /dev/kvm and get a file descriptor to it.
         let kvm = Kvm::new().map_err(Error::KvmIoctl)?;
 
@@ -41,11 +46,22 @@ impl VMM {
         let epoll = EpollContext::new().map_err(Error::EpollError)?;
         epoll.add_stdin().map_err(Error::EpollError)?;
 
+        let tap = open_tap(
+            None,
+            Some(tap_ip_addr),
+            Some(tap_netmask),
+            &mut None,
+            None,
+            None,
+        )
+        .map_err(Error::OpenTap)?;
+
         let vmm = VMM {
             vm_fd,
             kvm,
             guest_memory: GuestMemoryMmap::default(),
             vcpus: vec![],
+            _tap: tap,
             serial: Arc::new(Mutex::new(
                 LumperSerial::new().map_err(Error::SerialCreation)?,
             )),
