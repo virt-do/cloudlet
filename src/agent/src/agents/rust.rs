@@ -1,9 +1,8 @@
-use std::{fs::create_dir_all, process::Command};
-
+use super::Agent;
+use crate::{workload, AgentResult};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
-
-use crate::{Agent, AgentConfig, AgentResult};
+use std::{fs::create_dir_all, process::Command};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -18,7 +17,7 @@ struct RustAgentConfig {
 }
 
 pub struct RustAgent {
-    agent_config: AgentConfig,
+    workload_config: workload::config::Config,
     rust_config: RustAgentConfig,
 }
 
@@ -43,12 +42,15 @@ impl RustAgent {
             Ok(std::str::from_utf8(&output.stdout).unwrap().to_string())
         }
     }
+}
 
-    pub fn new_from_config(agent_config: AgentConfig) -> Self {
-        let rust_config: RustAgentConfig = toml::from_str(&agent_config.config_string).unwrap();
+// TODO should change with a TryFrom
+impl From<workload::config::Config> for RustAgent {
+    fn from(workload_config: workload::config::Config) -> Self {
+        let rust_config: RustAgentConfig = toml::from_str(&workload_config.config_string).unwrap();
 
-        RustAgent {
-            agent_config,
+        Self {
+            workload_config,
             rust_config,
         }
     }
@@ -77,7 +79,7 @@ impl Agent for RustAgent {
             version = "0.1.0"
             edition = "2018"
         "#,
-            self.agent_config.workload_name
+            self.workload_config.workload_name
         );
 
         std::fs::write(format!("{}/Cargo.toml", &function_dir), cargo_toml)
@@ -91,17 +93,17 @@ impl Agent for RustAgent {
         let binary_path = match self.rust_config.build.release {
             true => format!(
                 "{}/target/release/{}",
-                &function_dir, self.agent_config.workload_name
+                &function_dir, self.workload_config.workload_name
             ),
             false => format!(
                 "{}/target/debug/{}",
-                &function_dir, self.agent_config.workload_name
+                &function_dir, self.workload_config.workload_name
             ),
         };
 
         std::fs::copy(
             binary_path,
-            format!("/tmp/{}", self.agent_config.workload_name),
+            format!("/tmp/{}", self.workload_config.workload_name),
         )
         .expect("Unable to copy binary");
 
@@ -111,7 +113,7 @@ impl Agent for RustAgent {
     }
 
     fn run(&self) -> AgentResult<()> {
-        let output = Command::new(format!("/tmp/{}", self.agent_config.workload_name))
+        let output = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
             .output()
             .expect("Failed to run function");
 

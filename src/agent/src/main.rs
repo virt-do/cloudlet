@@ -1,16 +1,18 @@
-use agent::AgentRunner;
+use agent::workload::{config::Config, runner::Runner};
 use clap::Parser;
+use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 struct Args {
     #[clap(short, long, default_value = "/etc/cloudlet/agent/config.toml")]
-    config: String,
+    config: PathBuf,
 }
 
 fn main() {
     let args = Args::parse();
 
-    let agent_runner = AgentRunner::new(args.config);
+    let config = Config::from_file(&args.config).unwrap();
+    let runner = Runner::new(config);
 
-    agent_runner.run().unwrap();
+    runner.run().unwrap();
 }
