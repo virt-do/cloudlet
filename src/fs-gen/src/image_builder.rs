@@ -1,7 +1,9 @@
-use std::path::{Path, PathBuf};
+//! Image builder module
 
+use std::path::{Path, PathBuf};
 use vfs::{FileSystem, OverlayFS, PhysicalFS, VfsPath};
 
+/// Builds a new initramfs from path blobs and places it into a given destination folder
 pub fn build_new_image(blob_paths: &Vec<PathBuf>, output_folder: &Path) {
     let virtual_paths = blob_paths
         .iter()

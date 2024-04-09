@@ -1,12 +1,12 @@
-use std::{env, path::PathBuf};
+//! Command-line interface arguments and their management
 
+use std::{env, path::PathBuf};
 use clap::{command, Parser};
 use regex::Regex;
-
 use once_cell::sync::Lazy;
 use validator::Validate;
 
-// So, for any of you who may be scared, this is the regex from the OCI Distribution Sepcification for the image name + the tag
+/// Official regex from the OCI Distribution Sepcification (image name and tag)
 static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*:[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}").unwrap()
 });
@@ -16,7 +16,6 @@ static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
 #[command(version, about, long_about = None)]
 pub struct CliArgs {
     /// The name of the image to download
-
     #[arg(short, long)]
     #[validate(regex(path = *RE_IMAGE_NAME))]
     pub image_name: String,
@@ -33,7 +32,7 @@ impl CliArgs {
 
         let validation = args.validate();
         if validation.is_err() {
-            panic!("Invalid arguments: {}", validation.expect_err("wut"));
+            panic!("Invalid arguments: {}", validation.expect_err("Invalid arguments given"));
         }
 
         args
