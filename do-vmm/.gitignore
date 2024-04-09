@@ -1,0 +1,4 @@
+kernel/linux-cloud-hypervisor
+rootfs/alpine-minirootfs*
+rootfs/initramfs.img
+
