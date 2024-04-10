@@ -1,9 +1,12 @@
 use clap::Parser;
 mod types;
 mod utils;
-use std::io::{self};
+use std::{
+    io::{self},
+    path::PathBuf,
+};
 use types::{Config, Language, LogLevel};
-use utils::load_config;
+use utils::{load_config, read_file};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -14,56 +17,48 @@ struct Args {
 
 #[derive(Parser, Debug)]
 enum Commands {
-    Configure {
+    Run {
         #[arg(short, long)]
-        config_path: String,
+        config_path: PathBuf,
     },
-    Status {},
-    Apply {},
-    Kill {},
 }
 
 #[tokio::main]
-
 async fn main() -> io::Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Commands::Configure { config_path } => {
-            let config: Config = load_config(&config_path).unwrap();
+        Commands::Run { config_path } => {
+            let yaml_config: Config =
+                load_config(&config_path).expect("Error while loading the configuration file");
 
+            let code =
+                read_file(&yaml_config.code_path).expect("Error while reading the code file");
+            println!("Code from file: \n{}", code);
+
+            let env =
+                read_file(&yaml_config.env_path).expect("Error while reading the environment file");
+            println!("Env from file : \n{}", env);
             println!("Configuration from YAML file:");
             println!(
                 "Language: {}",
-                match config.language {
+                match yaml_config.language {
                     Language::Rust => "Rust",
                     Language::Python => "Python",
                     Language::Node => "Node",
                 }
             );
-            println!("Env Path: {}", config.env_path);
-            println!("Code Path: {}", config.code_path);
+            println!("Env Path: {}", yaml_config.env_path);
             println!(
                 "Log Level: {}",
-                match config.log_level {
+                match yaml_config.log_level {
                     LogLevel::Debug => "Debug",
                     LogLevel::Info => "Info",
                     LogLevel::Warn => "Warn",
                     LogLevel::Error => "Error",
                 }
             );
-        }
-
-        Commands::Status {} => {
-            println!("Getting status");
-        }
-
-        Commands::Apply {} => {
-            println!("Applying configuration");
-        }
-
-        Commands::Kill {} => {
-            println!("Killing configuration");
+            println!("Code Path: {}", yaml_config.code_path);
         }
     }
 
