@@ -15,10 +15,13 @@ fn main() {
 
     // merge_layer(&paths, &PathBuf::from_str("./titi").unwrap());
 
-
-    if let Err(e) = image_loader::download_image_fs(&args.image_name, args.output_file) {
-        eprintln!("Error: {}", e);
-    } else {
-        println!("Image downloaded successfully!");
+    match image_loader::download_image_fs(&args.image_name, args.output_file) {
+        Err(e) => eprintln!("Error: {}", e),
+        Ok(layers_paths) => {
+            println!("Image downloaded successfully! Layers' paths:");
+            for path in layers_paths {
+                println!(" - {}", path.display());
+            }
+        }
     }
 }
