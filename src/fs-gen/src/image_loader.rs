@@ -5,10 +5,13 @@ use std::fs::create_dir;
 use std::path::PathBuf;
 use tar::Archive;
 
-pub fn download_image_fs(image_name: &str, output_file: PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn download_image_fs(
+    image_name: &str,
+    output_file: PathBuf,
+) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     // Get image's name and tag
     let image_and_tag: Vec<&str> = image_name.split(":").collect();
-    let mut tag = "";
+    let tag: &str;
     if image_and_tag.len() < 2 {
         tag = "latest"
     } else {
@@ -19,14 +22,17 @@ pub fn download_image_fs(image_name: &str, output_file: PathBuf) -> Result<(), B
     // Download image manifest
     let mut manifest_json = download_manifest(image_name, tag)?;
 
+    println!("manifest: {}",manifest_json);
+
     // Verify if it's a manifest or a manifest list
     let mut layers = manifest_json["layers"].as_array();
 
     if layers.is_none() {
         let manifests = manifest_json["manifests"].as_array();
         match manifests {
-            None => eprintln!("This image's manifest format is not supported"),
+            None => Err(format!("Couldn't find a Docker V2 or OCI manifest for {}:{}", image_name, tag))?,
             Some(m) => {
+                println!("Manifest list found. Looking for an amd64 manifest...");
                 // Get a manifest for amd64 architecture from the manifest list
                 let amd64_manifest = m.iter().find(|manifest| {
                     manifest["platform"].as_object().unwrap()["architecture"]
@@ -36,14 +42,14 @@ pub fn download_image_fs(image_name: &str, output_file: PathBuf) -> Result<(), B
                 });
 
                 match amd64_manifest {
-                    None => eprintln!("This image doesn't support amd64 architecture"),
+                    None => Err("This image doesn't support amd64 architecture")?,
                     Some(m) => {
+                        println!("Downloading manifest for amd64 architecture...");
                         manifest_json =
                             download_manifest(image_name, m["digest"].as_str().unwrap())?;
                         layers = manifest_json["layers"].as_array();
                         if layers.is_none() {
-                            eprintln!("Couldn't find image layers.");
-                            return Ok(());
+                            Err("Couldn't find image layers in the manifest.")?
                         }
                     }
                 }
@@ -72,7 +78,6 @@ fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value
         "https://registry-1.docker.io/v2/library/{}/manifests/{}",
         image_name, digest
     );
-    println!("url: {manifest_url}");
 
     let manifest_response = client
         .get(&manifest_url)
@@ -89,7 +94,7 @@ fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value
         .send()?;
 
     let manifest_json: serde_json::Value = manifest_response.json()?;
-    println!("manifest: {}", manifest_json);
+
     Ok(manifest_json)
 }
 
@@ -103,7 +108,7 @@ fn download_layers(
     layers: &Vec<serde_json::Value>,
     image_name: &str,
     output_dir: &PathBuf,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     let client = Client::new();
 
     // Get a token for anonymous authentication to Docker Hub
@@ -112,6 +117,10 @@ fn download_layers(
         .send()?.json()?;
 
     let token = token_json["token"].as_str().unwrap();
+
+    let mut layer_paths = Vec::new();
+
+    println!("Downloading and unpacking layers:");
 
     // Download and unpack each layer
     for layer in layers {
@@ -123,6 +132,8 @@ fn download_layers(
 
         let response = client.get(&layer_url).bearer_auth(token).send()?;
 
+        print!(" - {}", digest);
+
         let tar = GzDecoder::new(response);
 
         let mut output_path = PathBuf::new();
@@ -130,6 +141,8 @@ fn download_layers(
         output_path.push(digest);
 
         unpack_tarball(tar, &output_path)?;
+        println!(" - unpacked");
+        layer_paths.push(output_path);
     }
-    Ok(())
+    Ok(layer_paths)
 }
