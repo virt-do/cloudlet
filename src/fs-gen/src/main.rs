@@ -1,7 +1,7 @@
 use std::{fs, path::{Path, PathBuf}, str::FromStr};
 
 use image_builder::merge_layer;
-use crate::initramfs_generator::create_init_file;
+use crate::initramfs_generator::{create_init_file, generate_initramfs};
 
 mod cli_args;
 mod image_builder;
@@ -27,8 +27,12 @@ fn main() {
             for path in &layers_paths {
                 println!(" - {}", path.display());
             }
-            merge_layer(&layers_paths, Path::new("/tmp/cloudlet"));
-            create_init_file(Path::new("/tmp/cloudlet"));
+
+            let path = Path::new("/tmp/cloudlet");
+
+            merge_layer(&layers_paths, path);
+            create_init_file(path);
+            generate_initramfs(path, Path::new("/tmp/rusty.img"));
         }
     }
 }
