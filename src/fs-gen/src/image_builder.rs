@@ -74,6 +74,7 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path) -> Result<()> {
 
     // Enable a fuse session to make the fs available
     let mut se = FuseSession::new(mountpoint, fs_name, "", true).unwrap();
+    se.set_allow_other(false);
     se.mount().unwrap();
 
     // Fuse session
