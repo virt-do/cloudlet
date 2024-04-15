@@ -19,7 +19,6 @@ pub struct CliArgs {
 
     /// The path to the output file
     #[arg(short, long, default_value=get_default_log_path().into_os_string())]
-
     pub output_file: PathBuf,
 
     /// The host path to the guest agent binary
@@ -71,7 +70,7 @@ impl CliArgs {
 fn get_default_log_path() -> PathBuf {
     let mut path = env::current_exe().unwrap();
     path.pop();
-    path.push("output");
+    path.push("output.cpio");
     path
 }
 
