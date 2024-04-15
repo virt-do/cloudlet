@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf, str::FromStr};
+use std::{fs, path::{Path, PathBuf}, str::FromStr};
 
 use image_builder::merge_layer;
 
@@ -15,13 +15,17 @@ fn main() {
 
     // merge_layer(&paths, &PathBuf::from_str("./titi").unwrap());
 
-    match image_loader::download_image_fs(&args.image_name, args.output_file) {
-        Err(e) => eprintln!("Error: {}", e),
+    match image_loader::download_image_fs(&args.image_name, args.output_file.clone()) {
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            return;
+        },
         Ok(layers_paths) => {
             println!("Image downloaded successfully! Layers' paths:");
-            for path in layers_paths {
+            for path in &layers_paths {
                 println!(" - {}", path.display());
             }
+            merge_layer(&layers_paths, Path::new("/tmp/cloudlet"));
         }
     }
 }

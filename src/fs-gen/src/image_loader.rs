@@ -22,15 +22,16 @@ pub fn download_image_fs(
     // Download image manifest
     let mut manifest_json = download_manifest(image_name, tag)?;
 
-    println!("manifest: {}",manifest_json);
-
     // Verify if it's a manifest or a manifest list
     let mut layers = manifest_json["layers"].as_array();
 
     if layers.is_none() {
         let manifests = manifest_json["manifests"].as_array();
         match manifests {
-            None => Err(format!("Couldn't find a Docker V2 or OCI manifest for {}:{}", image_name, tag))?,
+            None => Err(format!(
+                "Couldn't find a Docker V2 or OCI manifest for {}:{}",
+                image_name, tag
+            ))?,
             Some(m) => {
                 println!("Manifest list found. Looking for an amd64 manifest...");
                 // Get a manifest for amd64 architecture from the manifest list
@@ -94,6 +95,8 @@ fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value
         .send()?;
 
     let manifest_json: serde_json::Value = manifest_response.json()?;
+
+    println!("{}", manifest_json);
 
     Ok(manifest_json)
 }
