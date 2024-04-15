@@ -1,7 +1,7 @@
 use clap::ValueEnum;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, ValueEnum, Deserialize)]
+#[derive(Clone, Debug, ValueEnum, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
     Rust,
@@ -9,7 +9,7 @@ pub enum Language {
     Node,
 }
 
-#[derive(Clone, Debug, ValueEnum, Deserialize)]
+#[derive(Clone, Debug, ValueEnum, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Debug,

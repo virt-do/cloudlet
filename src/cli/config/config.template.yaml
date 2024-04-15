@@ -1,4 +1,4 @@
 language: rust
-env_path: .env
-code_path: src
+env_path: /path/cloudlet/src/cli/config/example.env
+code_path: /path/cloudlet/src/cli/src/main.rs
 log_level: debug

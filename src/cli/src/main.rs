@@ -1,69 +1,42 @@
 use clap::Parser;
+
+use args::{CliArgs, Commands};
+use request::run_request;
+use request::HttpRunRequest;
+use std::io::{self};
+use types::Config;
+use utils::{load_config, read_file};
+
+mod args;
+mod request;
 mod types;
 mod utils;
-use std::io::{self};
-use types::{Config, Language, LogLevel};
-use utils::load_config;
-
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[command(subcommand)]
-    command: Commands,
-}
-
-#[derive(Parser, Debug)]
-enum Commands {
-    Configure {
-        #[arg(short, long)]
-        config_path: String,
-    },
-    Status {},
-    Apply {},
-    Kill {},
-}
 
 #[tokio::main]
-
 async fn main() -> io::Result<()> {
-    let args = Args::parse();
+    let args = CliArgs::parse();
 
     match args.command {
-        Commands::Configure { config_path } => {
-            let config: Config = load_config(&config_path).unwrap();
+        Commands::Run { config_path } => {
+            let yaml_config: Config =
+                load_config(&config_path).expect("Error while loading the configuration file");
 
-            println!("Configuration from YAML file:");
-            println!(
-                "Language: {}",
-                match config.language {
-                    Language::Rust => "Rust",
-                    Language::Python => "Python",
-                    Language::Node => "Node",
-                }
-            );
-            println!("Env Path: {}", config.env_path);
-            println!("Code Path: {}", config.code_path);
-            println!(
-                "Log Level: {}",
-                match config.log_level {
-                    LogLevel::Debug => "Debug",
-                    LogLevel::Info => "Info",
-                    LogLevel::Warn => "Warn",
-                    LogLevel::Error => "Error",
-                }
-            );
-        }
+            let code =
+                read_file(&yaml_config.code_path).expect("Error while reading the code file");
+            println!("Code from file: \n{}", code);
 
-        Commands::Status {} => {
-            println!("Getting status");
-        }
+            let env =
+                read_file(&yaml_config.env_path).expect("Error while reading the environment file");
+            println!("Env from file : \n{}", env);
+            println!("Configuration from YAML file: \n {:#?}", yaml_config);
 
-        Commands::Apply {} => {
-            println!("Applying configuration");
-        }
+            let body = HttpRunRequest::new(yaml_config.language, env, code, yaml_config.log_level);
+            let response = run_request(body).await;
 
-        Commands::Kill {} => {
-            println!("Killing configuration");
+            match response {
+                Ok(_) => println!("Request successful"),
+                Err(e) => eprintln!("Error while making the request: {}", e),
+            }
         }
     }
 
