@@ -1,4 +1,4 @@
-mod messages;
+pub mod messages;
 
 use std::io::{Read, Write};
 
@@ -91,9 +91,11 @@ impl CloudletProtocol {
     /// * `message` - The message to send
     pub fn send_message(&mut self, message: CloudletMessage) {
         let mut buffer: Vec<u8> = Vec::new();
+        let message_type = message.message_type as u16;
         buffer.push((message.checksum >> 8) as u8);
         buffer.push((message.checksum & 0xFF) as u8);
-        buffer.push((message.message_type as u16 >> 8) as u8);
+        buffer.push((message_type as u16 >> 8) as u8);
+        buffer.push((message_type as u16 & 0xFF) as u8);
         let json_payload = serde_json::to_string(&message.payload).unwrap();
         buffer.extend(json_payload.as_bytes());
 
@@ -143,16 +145,27 @@ impl CloudletProtocol {
 
         let checksum = u16::from_be_bytes([buffer[0], buffer[1]]);
         let message_type = u16::from_be_bytes([buffer[2], buffer[3]]);
-        let message_type = MessageType::try_from(message_type).map_err(Error::MessageTypeDeserializationError)?;
+        let message_type =
+            MessageType::try_from(message_type).map_err(Error::MessageTypeDeserializationError)?;
         let json_payload = String::from_utf8_lossy(&buffer[4..]).into_owned();
 
-        let payload = match message_type {
-            MessageType::Start => Payload::Start(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
-            MessageType::Exit => Payload::Exit(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
-            MessageType::Interrupt => Payload::Interrupt(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
-            MessageType::Ok => Payload::Ok(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
-            MessageType::Log => Payload::Log(serde_json::from_str(&json_payload).map_err(Error::PayloadDeserializationError)?),
-        };
+        let payload =
+            match message_type {
+                MessageType::Start => serde_json::from_str(&json_payload)
+                    .map_err(Error::PayloadDeserializationError)?,
+
+                MessageType::Exit => serde_json::from_str(&json_payload)
+                    .map_err(Error::PayloadDeserializationError)?,
+
+                MessageType::Interrupt => serde_json::from_str(&json_payload)
+                    .map_err(Error::PayloadDeserializationError)?,
+
+                MessageType::Ok => serde_json::from_str(&json_payload)
+                    .map_err(Error::PayloadDeserializationError)?,
+
+                MessageType::Log => serde_json::from_str(&json_payload)
+                    .map_err(Error::PayloadDeserializationError)?,
+            };
 
         if checksum != create_checksum(&payload) {
             return Err(Error::ChecksumError);
