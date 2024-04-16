@@ -43,7 +43,7 @@ pub struct StartMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExitMessage {
     code: i32,
-    stdin: String,
+    stderr: String,
     stdout: String,
 }
 
