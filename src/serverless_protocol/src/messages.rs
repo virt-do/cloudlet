@@ -39,6 +39,12 @@ pub struct StartMessage {
     content: String,
 }
 
+impl StartMessage {
+    pub fn new(content: String) -> Self {
+        Self { content }
+    }
+}
+
 /// Expects OkMessage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExitMessage {
@@ -47,19 +53,47 @@ pub struct ExitMessage {
     stdout: String,
 }
 
+impl ExitMessage {
+    pub fn new(code: i32, stderr: String, stdout: String) -> Self {
+        Self {
+            code,
+            stderr,
+            stdout,
+        }
+    }
+}
+
 /// Expects OkMessage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InterruptMessage {
     signal: i32,
 }
 
+impl InterruptMessage {
+    pub fn new(signal: i32) -> Self {
+        Self { signal }
+    }
+}
+
 /// Mostly used to answer other messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OkMessage {}
+
+impl OkMessage {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 /// Expects OkMessage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogMessage {
     kind: String,
     content: String,
+}
+
+impl LogMessage {
+    pub fn new(kind: String, content: String) -> Self {
+        Self { kind, content }
+    }
 }
