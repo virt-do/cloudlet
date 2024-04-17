@@ -5,6 +5,8 @@ use std::io::{Read, Write};
 use messages::{MessageType, Payload};
 use serialport::TTYPort;
 
+use sha256::digest;
+
 const TERMINATOR: u8 = 0xC0;
 const ESCAPE: u8 = 0xDB;
 const ESCAPE_TERMINATOR: u8 = 0xDC;
@@ -29,22 +31,22 @@ pub struct CloudletProtocol {
 #[derive(Debug)]
 pub struct CloudletMessage {
     pub message_type: MessageType,
-    pub checksum: u16,
+    pub checksum: Vec<u8>,
     pub payload: Payload,
 }
 
-pub fn create_checksum(payload: &Payload) -> u16 {
-    let mut checksum: u16 = 0;
-    let json_payload = serde_json::to_string(payload).unwrap();
-    for byte in json_payload.as_bytes() {
-        checksum = checksum.wrapping_add(*byte as u16);
-    }
-    checksum
+pub fn create_checksum(message_type: &MessageType, payload: &Payload) -> Vec<u8> {
+    let type_bytes = message_type.to_owned() as u8;
+    let mut bytes = vec![type_bytes];
+
+    bytes.append(&mut bincode::serialize(payload).unwrap());
+
+    digest(&bytes).as_bytes().to_vec()
 }
 
 impl CloudletMessage {
     pub fn new(message_type: MessageType, payload: Payload) -> CloudletMessage {
-        let checksum = create_checksum(&payload);
+        let checksum = create_checksum(&message_type, &payload);
 
         CloudletMessage {
             message_type,
@@ -92,8 +94,7 @@ impl CloudletProtocol {
     pub fn send_message(&mut self, message: CloudletMessage) {
         let mut buffer: Vec<u8> = Vec::new();
         let message_type = message.message_type as u16;
-        buffer.push((message.checksum >> 8) as u8);
-        buffer.push((message.checksum & 0xFF) as u8);
+        buffer.append(&mut message.checksum.clone());
         buffer.push((message_type >> 8) as u8);
         buffer.push((message_type & 0xFF) as u8);
         let json_payload = serde_json::to_string(&message.payload).unwrap();
@@ -143,11 +144,11 @@ impl CloudletProtocol {
             )));
         }
 
-        let checksum = u16::from_be_bytes([buffer[0], buffer[1]]);
-        let message_type = u16::from_be_bytes([buffer[2], buffer[3]]);
+        let checksum = buffer[0..64].to_vec();
+        let message_type = u16::from_be_bytes([buffer[64], buffer[65]]);
         let message_type =
             MessageType::try_from(message_type).map_err(Error::MessageTypeDeserializationError)?;
-        let json_payload = String::from_utf8_lossy(&buffer[4..]).into_owned();
+        let json_payload = String::from_utf8_lossy(&buffer[66..]).into_owned();
 
         let payload =
             match message_type {
@@ -167,7 +168,7 @@ impl CloudletProtocol {
                     .map_err(Error::PayloadDeserializationError)?,
             };
 
-        if checksum != create_checksum(&payload) {
+        if checksum != create_checksum(&message_type, &payload) {
             return Err(Error::ChecksumError);
         }
 
