@@ -12,8 +12,11 @@ fn main() {
     let args = cli_args::CliArgs::get_args();
     println!("Hello, world!, {:?}", args);
 
+    let layers_subdir = args.temp_directory.clone().join("layers/");
+    let overlay_subdir = args.temp_directory.clone().join("overlay/");
+
     // TODO: better organise layers and OverlayFS build in the temp directory
-    match image_loader::download_image_fs(&args.image_name, args.temp_directory.clone()) {
+    match image_loader::download_image_fs(&args.image_name, layers_subdir) {
         Err(e) => {
             eprintln!("Error: {}", e);
             return;
@@ -25,7 +28,7 @@ fn main() {
             }
 
             // FIXME: use a subdir of the temp directory instead
-            let path = Path::new("/tmp/cloudlet");
+            let path = Path::new(overlay_subdir.as_path());
 
             merge_layer(&layers_paths, path);
             create_init_file(path);
