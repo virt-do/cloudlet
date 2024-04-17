@@ -94,8 +94,8 @@ impl CloudletProtocol {
         let message_type = message.message_type as u16;
         buffer.push((message.checksum >> 8) as u8);
         buffer.push((message.checksum & 0xFF) as u8);
-        buffer.push((message_type as u16 >> 8) as u8);
-        buffer.push((message_type as u16 & 0xFF) as u8);
+        buffer.push((message_type >> 8) as u8);
+        buffer.push((message_type & 0xFF) as u8);
         let json_payload = serde_json::to_string(&message.payload).unwrap();
         buffer.extend(json_payload.as_bytes());
 

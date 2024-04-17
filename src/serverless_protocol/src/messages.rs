@@ -85,6 +85,12 @@ impl OkMessage {
     }
 }
 
+impl Default for OkMessage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Expects OkMessage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogMessage {
