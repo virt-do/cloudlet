@@ -18,15 +18,15 @@ pub struct CliArgs {
     pub image_name: String,
 
     /// The path to the output file
-    #[arg(short, long, default_value=get_default_log_path().into_os_string())]
+    #[arg(short='o', long="output", default_value=get_default_output_file().into_os_string())]
     pub output_file: PathBuf,
+
+    /// The path to the temporary folder
+    #[arg(short='t', long="tempdir", default_value=get_default_temp_directory().into_os_string())]
+    pub temp_directory: PathBuf,
 
     /// The host path to the guest agent binary
     pub agent_host_path: PathBuf,
-
-    /// The target path of the guest agent binary
-    #[arg(short, long, default_value=get_default_target_agent_path().into_os_string())]
-    pub agent_target_path: PathBuf,
 }
 
 impl CliArgs {
@@ -67,13 +67,14 @@ impl CliArgs {
 }
 
 /// Get the default output path for the cpio file.
-fn get_default_log_path() -> PathBuf {
-    let mut path = env::current_exe().unwrap();
-    path.pop();
-    path.push("output.cpio");
+fn get_default_temp_directory() -> PathBuf {
+    let mut path = env::current_dir().unwrap();
+    path.push(".cloudlet_temp/");
     path
 }
 
-fn get_default_target_agent_path() -> PathBuf {
-    PathBuf::from("/usr/bin/agent")
+fn get_default_output_file() -> PathBuf {
+    let mut path = env::current_dir().unwrap();
+    path.push("initramfs.img");
+    path
 }
