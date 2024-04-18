@@ -13,7 +13,8 @@ socat -d -d pty,raw,echo=0 pty,raw,echo=0
 2. Run the example:
 
 ```bash
-cargo run --example cargo run --example serverless_protocol_example -- --serial-path-a=<path_to_first_pty> --serial-path-b=<path_to_second_pty>
+cargo run --example serverless_protocol_example -- --serial-path-a=<path_to_first_pty> --serial-path-b=<path_to_second_pty>
 ```
 
 This example will show how processes can communicate over a serial connection.
+
