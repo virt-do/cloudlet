@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
@@ -19,9 +21,9 @@ pub enum LogLevel {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Config {
+pub struct YamlConfigFile {
     pub language: Language,
-    pub env_path: String,
-    pub code_path: String,
+    pub env_path: PathBuf,
+    pub code_path: PathBuf,
     pub log_level: LogLevel,
 }
