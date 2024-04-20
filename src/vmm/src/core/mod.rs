@@ -27,6 +27,8 @@ pub enum Error {
     Cmdline(linux_loader::cmdline::Error),
     /// Failed to load kernel.
     KernelLoad(loader::Error),
+    /// Failed to load the initramfs.
+    InitramfsLoad,
     /// Invalid E820 configuration.
     E820Configuration,
     /// Highmem start address is past the guest memory end.
