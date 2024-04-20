@@ -7,24 +7,21 @@ enum Language {
   JAVASCRIPT = 1;
   RUST = 2;
 }
-
 enum LogLevel {
   DEBUG = 0;
   INFO = 1;
   WARN = 2;
   ERROR = 3;
 }
-
 service VmmService {
   rpc Run (RunVmmRequest) returns (RunVmmResponse);
+  
 }
-
 message RunVmmRequest {
   Language language = 1;
   LogLevel log_level = 4;
   string code = 2;
   string env = 3;
 }
-
 message RunVmmResponse {
 }

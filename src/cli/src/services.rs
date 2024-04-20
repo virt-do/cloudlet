@@ -1,27 +1,28 @@
-use crate::types::{Language, LogLevel};
+use crate::types::{Config, Language, LogLevel};
+use crate::utils::read_file;
 use reqwest::Client;
 use serde::Serialize;
 use std::error::Error;
 
+
 #[derive(Serialize, Debug)]
 pub struct HttpRunRequest {
     pub language: Language,
-    pub env_content: String,
-    pub code_content: String,
+    pub env: String,
+    pub code: String,
     pub log_level: LogLevel,
 }
 
 impl HttpRunRequest {
-    pub fn new(
-        language: Language,
-        env_content: String,
-        code_content: String,
-        log_level: LogLevel,
-    ) -> Self {
+    pub fn new(config: Config) -> Self {
+        let code: String = read_file(&config.code_path).expect("Error while reading the code file");
+        let env = read_file(&config.env_path).expect("Error while reading the environment file");
+        let language = config.language;
+        let log_level = config.log_level;
         HttpRunRequest {
             language,
-            env_content,
-            code_content,
+            env,
+            code,
             log_level,
         }
     }
