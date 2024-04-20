@@ -10,6 +10,9 @@ use vmm_sys_util::eventfd::EventFd;
 pub const SERIAL_PORT_BASE: u16 = 0x3f8;
 pub const SERIAL_PORT_LAST_REGISTER: u16 = SERIAL_PORT_BASE + 0x8;
 
+pub const SERIAL2_PORT_BASE: u16 = 0x2f8;
+pub const SERIAL2_PORT_LAST_REGISTER: u16 = SERIAL2_PORT_BASE + 0x8;
+
 pub struct EventFdTrigger(EventFd);
 
 impl Trigger for EventFdTrigger {

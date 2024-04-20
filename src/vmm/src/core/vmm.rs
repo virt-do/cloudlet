@@ -30,6 +30,7 @@ pub struct VMM {
     _tap: Tap,
 
     serial: Arc<Mutex<LumperSerial>>,
+    serial2: Arc<Mutex<LumperSerial>>,
     epoll: EpollContext,
 }
 
@@ -63,6 +64,9 @@ impl VMM {
             vcpus: vec![],
             _tap: tap,
             serial: Arc::new(Mutex::new(
+                LumperSerial::new().map_err(Error::SerialCreation)?,
+            )),
+            serial2: Arc::new(Mutex::new(
                 LumperSerial::new().map_err(Error::SerialCreation)?,
             )),
             epoll,
@@ -124,6 +128,18 @@ impl VMM {
             )
             .map_err(Error::KvmIoctl)?;
 
+        self.vm_fd
+            .register_irqfd(
+                &self
+                    .serial2
+                    .lock()
+                    .unwrap()
+                    .eventfd()
+                    .map_err(Error::IrqRegister)?,
+                3,
+            )
+            .map_err(Error::KvmIoctl)?;
+
         Ok(())
     }
 
@@ -137,8 +153,13 @@ impl VMM {
             .map_err(Error::KvmIoctl)?;
 
         for index in 0..num_vcpus {
-            let vcpu = Vcpu::new(&self.vm_fd, index.into(), Arc::clone(&self.serial))
-                .map_err(Error::Vcpu)?;
+            let vcpu = Vcpu::new(
+                &self.vm_fd,
+                index.into(),
+                Arc::clone(&self.serial),
+                Arc::clone(&self.serial2),
+            )
+            .map_err(Error::Vcpu)?;
 
             // Set CPUID.
             let mut vcpu_cpuid = base_cpuid.clone();
