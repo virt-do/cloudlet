@@ -30,7 +30,7 @@ fn main() -> Result<(), Error> {
     let mut vmm =
         VMM::new(args.network_host_ip, args.network_host_netmask).map_err(Error::VmmNew)?;
 
-    vmm.configure(args.cpus, args.memory, &args.kernel)
+    vmm.configure(args.cpus, args.memory, &args.kernel, &args.initramfs)
         .map_err(Error::VmmConfigure)?;
 
     // Run the VMM

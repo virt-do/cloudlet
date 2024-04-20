@@ -214,9 +214,20 @@ impl VMM {
     /// * `num_vcpus` Number of virtual CPUs
     /// * `mem_size_mb` Memory size (in MB)
     /// * `kernel_path` Path to a Linux kernel
-    pub fn configure(&mut self, num_vcpus: u8, mem_size_mb: u32, kernel_path: &Path) -> Result<()> {
+    /// * `initramfs_path` Path to an initramfs
+    pub fn configure(
+        &mut self,
+        num_vcpus: u8,
+        mem_size_mb: u32,
+        kernel_path: &Path,
+        initramfs_path: &Path,
+    ) -> Result<()> {
         self.configure_memory(mem_size_mb)?;
-        let kernel_load = kernel::kernel_setup(&self.guest_memory, kernel_path.to_path_buf())?;
+        let kernel_load = kernel::kernel_setup(
+            &self.guest_memory,
+            kernel_path.to_path_buf(),
+            initramfs_path.to_path_buf(),
+        )?;
         self.configure_io()?;
         self.configure_vcpus(num_vcpus, kernel_load)?;
 
