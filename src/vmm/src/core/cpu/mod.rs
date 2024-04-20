@@ -17,6 +17,8 @@ mod gdt;
 use gdt::*;
 mod interrupts;
 use interrupts::*;
+
+use super::devices::serial::{CONTROL_SERIAL_PORT, CONTROL_SERIAL_PORT_LAST_REGISTER};
 pub(crate) mod mpspec;
 pub(crate) mod mptable;
 pub(crate) mod msr_index;
@@ -68,15 +70,23 @@ pub(crate) struct Vcpu {
     pub vcpu_fd: VcpuFd,
 
     serial: Arc<Mutex<LumperSerial>>,
+
+    control_serial: Arc<Mutex<LumperSerial>>,
 }
 
 impl Vcpu {
     /// Create a new vCPU.
-    pub fn new(vm_fd: &VmFd, index: u64, serial: Arc<Mutex<LumperSerial>>) -> Result<Self> {
+    pub fn new(
+        vm_fd: &VmFd,
+        index: u64,
+        serial: Arc<Mutex<LumperSerial>>,
+        control_serial: Arc<Mutex<LumperSerial>>,
+    ) -> Result<Self> {
         Ok(Vcpu {
             index,
             vcpu_fd: vm_fd.create_vcpu(index).map_err(Error::KvmIoctl)?,
             serial,
+            control_serial,
         })
     }
 
@@ -249,6 +259,20 @@ impl Vcpu {
                             )
                             .unwrap();
                     }
+                    CONTROL_SERIAL_PORT..=CONTROL_SERIAL_PORT_LAST_REGISTER => {
+                        println!("Control serial port write");
+                        self.control_serial
+                            .lock()
+                            .unwrap()
+                            .serial
+                            .write(
+                                (addr - CONTROL_SERIAL_PORT)
+                                    .try_into()
+                                    .expect("Invalid serial register offset"),
+                                data[0],
+                            )
+                            .unwrap();
+                    }
                     KBD_CMD_IO_ADDR => {
                         if data[0] == KBD_RESET_CMD {
                             info!(?exit_reason, "Guest reset via keyboard controller. Bye!");
@@ -266,6 +290,14 @@ impl Vcpu {
                     SERIAL_PORT_BASE..=SERIAL_PORT_LAST_REGISTER => {
                         data[0] = self.serial.lock().unwrap().serial.read(
                             (addr - SERIAL_PORT_BASE)
+                                .try_into()
+                                .expect("Invalid serial register offset"),
+                        );
+                    }
+                    CONTROL_SERIAL_PORT..=CONTROL_SERIAL_PORT_LAST_REGISTER => {
+                        println!("Control serial port write");
+                        data[0] = self.control_serial.lock().unwrap().serial.read(
+                            (addr - CONTROL_SERIAL_PORT)
                                 .try_into()
                                 .expect("Invalid serial register offset"),
                         );
