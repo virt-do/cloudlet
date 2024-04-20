@@ -15,7 +15,7 @@ pub struct CliArguments {
 
     /// Path to the cpio archive to use as the initramfs.
     #[arg(short, long, env)]
-    pub initramfs: PathBuf,
+    pub initramfs: Option<PathBuf>,
 
     /// Number of virtual CPUs assigned to the guest.
     #[clap(short, long, env, default_value = "1")]

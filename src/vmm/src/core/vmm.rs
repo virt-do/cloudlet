@@ -12,7 +12,7 @@ use std::io;
 use std::net::Ipv4Addr;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tracing::info;
@@ -220,13 +220,13 @@ impl VMM {
         num_vcpus: u8,
         mem_size_mb: u32,
         kernel_path: &Path,
-        initramfs_path: &Path,
+        initramfs_path: &Option<PathBuf>,
     ) -> Result<()> {
         self.configure_memory(mem_size_mb)?;
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
             kernel_path.to_path_buf(),
-            initramfs_path.to_path_buf(),
+            initramfs_path.clone(),
         )?;
         self.configure_io()?;
         self.configure_vcpus(num_vcpus, kernel_load)?;
