@@ -5,6 +5,24 @@ use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use tracing::level_filters;
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct CliArgs {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Parser, Debug)]
+pub enum Commands {
+    Grpc,
+    cli(CliArguments),
+}
+
+#[derive(Parser, Debug)]
+pub struct GrpcArgs {
+    // Add any necessary fields for gRPC configuration
+}
+
 /// The Virtual Machine Manager for the Cloudlet serverless runtime.
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

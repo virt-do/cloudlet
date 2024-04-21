@@ -1,24 +1,14 @@
-use crate::args::CliArguments;
+use crate::args::{CliArgs, CliArguments, Commands};
 use clap::Parser;
 use tracing::info;
-use vmm::core::{self, vmm::VMM};
-
+use vmm::{core::{self, vmm::VMM}, service::{vmmorchestrator, VmmService}, VmmErrors};
+use tonic::transport::Server;
 mod args;
 
-#[derive(Debug)]
-pub enum Error {
-    VmmNew(core::Error),
-    VmmConfigure(core::Error),
-    VmmRun(core::Error),
-}
-
-/// The application entry point.
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the configuration and configure logger verbosity
-    let args = CliArguments::parse();
-    tracing_subscriber::fmt()
-        .with_max_level(args.convert_log_to_tracing())
-        .init();
+    let args = CliArgs::parse();
 
     info!(
         app_name = env!("CARGO_PKG_NAME"),
@@ -26,15 +16,37 @@ fn main() -> Result<(), Error> {
         "Starting application",
     );
 
-    // Create a new VMM
-    let mut vmm =
-        VMM::new(args.network_host_ip, args.network_host_netmask).map_err(Error::VmmNew)?;
+    let addr = "127.0.0.1:50051".parse().unwrap();
+    let vmm_service = VmmService::default();
 
-    vmm.configure(args.cpus, args.memory, &args.kernel, &args.initramfs)
-        .map_err(Error::VmmConfigure)?;
+    // check if the args is grpc or command
 
-    // Run the VMM
-    vmm.run().map_err(Error::VmmRun)?;
+    match args.command {
+        Commands::Grpc => {
+            Server::builder()
+            .add_service(vmmorchestrator::vmm_service_server::VmmServiceServer::new(vmm_service))
+            .serve(addr)
+            .await?;
 
+        }
+        Commands::cli(CliArguments) => {
+            let cli_args = CliArguments::parse();
+            
+            tracing_subscriber::fmt()
+            .with_max_level(cli_args.convert_log_to_tracing())
+            .init();
+            // Create a new VMM
+            let mut vmm =
+                VMM::new(cli_args.network_host_ip, cli_args.network_host_netmask).map_err(VmmErrors::VmmNew).unwrap();
+        
+            vmm.configure(cli_args.cpus, cli_args.memory, &cli_args.kernel, &cli_args.initramfs)
+                .map_err(VmmErrors::VmmConfigure).unwrap();
+        
+            // Run the VMM
+            vmm.run().map_err(VmmErrors::VmmRun).unwrap();
+        
+        }
+    }
+  
     Ok(())
 }
