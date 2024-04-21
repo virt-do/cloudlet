@@ -16,17 +16,41 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tracing::info;
+use vm_allocator::{AddressAllocator, AllocPolicy};
+use vm_device::bus::{MmioAddress, MmioRange};
 use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
 use vmm_sys_util::terminal::Terminal;
 
+use super::devices::virtio::net::device::Net;
+use super::irq_allocator::IrqAllocator;
 use super::network::open_tap::open_tap;
 use super::network::tap::Tap;
 use super::slip_pty::SlipPty;
+
+#[cfg(target_arch = "x86_64")]
+pub(crate) const MMIO_GAP_END: u64 = 1 << 32;
+/// Size of the MMIO gap.
+#[cfg(target_arch = "x86_64")]
+pub(crate) const MMIO_GAP_SIZE: u64 = 768 << 20;
+/// The start of the MMIO gap (memory area reserved for MMIO devices).
+#[cfg(target_arch = "x86_64")]
+pub(crate) const MMIO_GAP_START: u64 = MMIO_GAP_END - MMIO_GAP_SIZE;
+/// Default address allocator alignment. It needs to be a power of 2.
+pub const DEFAULT_ADDRESS_ALIGNEMNT: u64 = 4;
+/// Default allocation policy for address allocator.
+pub const DEFAULT_ALLOC_POLICY: AllocPolicy = AllocPolicy::FirstMatch;
+/// IRQ line 4 is typically used for serial port 1.
+// See more IRQ assignments & info: https://tldp.org/HOWTO/Serial-HOWTO-8.html
+const SERIAL_IRQ: u32 = 4;
+/// Last usable IRQ ID for virtio device interrupts on x86_64.
+const IRQ_MAX: u8 = 23;
 
 pub struct VMM {
     vm_fd: VmFd,
     kvm: Kvm,
     guest_memory: GuestMemoryMmap,
+    address_allocator: Option<AddressAllocator>,
+    irq_allocator: IrqAllocator,
     vcpus: Vec<Vcpu>,
     _tap: Tap,
 
@@ -72,10 +96,14 @@ impl VMM {
             )
             .map_err(Error::EpollError)?;
 
+        let irq_allocator = IrqAllocator::new(SERIAL_IRQ, IRQ_MAX.into()).unwrap();
+
         let vmm = VMM {
             vm_fd,
             kvm,
             guest_memory: GuestMemoryMmap::default(),
+            address_allocator: None,
+            irq_allocator,
             vcpus: vec![],
             _tap: tap,
             serial: Arc::new(Mutex::new(
@@ -117,6 +145,19 @@ impl VMM {
         }
 
         self.guest_memory = guest_memory;
+
+        Ok(())
+    }
+
+    fn configure_allocators(&mut self, mem_size_mb: u32) -> Result<()> {
+        // Convert memory size from MBytes to bytes.
+        let mem_size = (mem_size_mb as u64) << 20;
+
+        // Setup address allocator.
+        let start_addr = MMIO_GAP_START;
+        let address_allocator = AddressAllocator::new(start_addr, mem_size).unwrap();
+
+        self.address_allocator = Some(address_allocator);
 
         Ok(())
     }
@@ -277,15 +318,43 @@ impl VMM {
         kernel_path: &Path,
         initramfs_path: &Option<PathBuf>,
     ) -> Result<()> {
+        let mut cmdline_extra_parameters = Vec::new();
+
         self.configure_memory(mem_size_mb)?;
+        self.configure_allocators(mem_size_mb)?;
+
+        let vmmio_parameter = self.configure_net_device().unwrap();
+        cmdline_extra_parameters.push(vmmio_parameter);
+
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
             kernel_path.to_path_buf(),
             initramfs_path.clone(),
+            cmdline_extra_parameters,
         )?;
         self.configure_io()?;
         self.configure_vcpus(num_vcpus, kernel_load)?;
 
         Ok(())
+    }
+
+    pub fn configure_net_device(&mut self) -> Result<String> {
+        let _mem = Arc::new(self.guest_memory.clone());
+        let range = if let Some(allocator) = &self.address_allocator {
+            allocator
+                .to_owned()
+                .allocate(0x1000, DEFAULT_ADDRESS_ALIGNEMNT, DEFAULT_ALLOC_POLICY)
+                .unwrap()
+        } else {
+            // Handle the case where self.address_allocator is None
+            panic!("Address allocator is not initialized");
+        };
+        let _mmio_range = MmioRange::new(MmioAddress(range.start()), range.len()).unwrap();
+        let irq = self.irq_allocator.next_irq().unwrap();
+
+        // !TODO: MMIO Device Discovery + MMIO Device Register Layout
+        let net = Net::new(range.len(), GuestAddress(range.start()), irq).unwrap();
+
+        Ok(net.get_vmmio_parameter())
     }
 }

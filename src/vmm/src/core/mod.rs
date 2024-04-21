@@ -13,6 +13,7 @@ use self::network::open_tap;
 mod cpu;
 mod devices;
 mod epoll_context;
+mod irq_allocator;
 mod kernel;
 mod network;
 mod slip_pty;
