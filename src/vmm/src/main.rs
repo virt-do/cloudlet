@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Starting application",
     );
 
-    let addr = "127.0.0.1:50051".parse().unwrap();
+    let addr = "[::1]:50051".parse().unwrap();
     let vmm_service = VmmService::default();
 
     // check if the args is grpc or command

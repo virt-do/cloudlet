@@ -1,8 +1,9 @@
 use tonic::{transport::Server, Request, Response, Status};
 use crate::core::vmm::{self, VMM};
-use std::{convert::From, net::Ipv4Addr, path::{Path, PathBuf}};
+use std::{convert::From, net::Ipv4Addr, path::{Path, PathBuf}, process::{Command, Stdio}};
 use crate::VmmErrors;
 use self::vmmorchestrator::{vmm_service_server::VmmService as VmmServiceTrait, RunVmmRequest, RunVmmResponse};
+use tracing::info;
 
 pub mod vmmorchestrator {
     tonic::include_proto!("vmmorchestrator");
@@ -31,15 +32,39 @@ impl VmmServiceTrait for VmmService {
     ) -> Result<Response<RunVmmResponse>, Status> {
         let response = vmmorchestrator::RunVmmResponse {};
 
-        const host_ip: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
-        const host_netmask: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
-        // Check if the kernel is on the system, else download it
+        const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
+        const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
+        
+        // Check if the kernel is on the system, else build it
+        println!("BEFORE");
 
-        let kernel_path: &Path = &Path::new("../../../initramfs.img");
-        let initramfs_path: PathBuf = PathBuf::new(); // Create an owned PathBuf
+        if !Path::new("./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin").exists() {
+            info!("Kernel not found, building kernel");
+            // Execute the script using sh and capture output and error streams
+            let output = Command::new("sh")
+                .arg("./tools/kernel/mkkernel.sh")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .expect("Failed to execute the kernel build script");
+
+            // Print output and error streams
+            println!("Script output: {}", String::from_utf8_lossy(&output.stdout));
+            println!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
+
+        };
+
+        let kernel_path = &Path::new("./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
+        let mut initramfs_path: PathBuf = PathBuf::new(); 
+
+        // Todo - Check if the initramfs for the specified language is on the system, else build it
+        initramfs_path.push("./initramfs.img"); // Append the path to the PathBuf
+
+        println!("Kernel path: {:?}", kernel_path);
+
         // // Create a new VMM
         let mut vmm =
-            VMM::new(host_ip, host_netmask).map_err(VmmErrors::VmmNew)?;
+            VMM::new(HOST_IP, HOST_NETMASK).map_err(VmmErrors::VmmNew)?;
 
         vmm.configure(1, 512, &kernel_path, &Some(initramfs_path))
             .map_err(VmmErrors::VmmConfigure)?;
