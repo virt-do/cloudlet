@@ -225,6 +225,6 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,vim,intellij+all,rust,rust-analyzer,visualstudiocode
 
-# RooFs and Kernel  
+# RootFs and Kernel
 kernel/*
 rootfs/*
