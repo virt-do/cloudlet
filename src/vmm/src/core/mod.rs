@@ -15,10 +15,10 @@ mod devices;
 mod epoll_context;
 mod kernel;
 mod network;
+mod slip_pty;
 pub mod vmm;
 
 #[derive(Debug)]
-
 /// VMM errors.
 pub enum Error {
     /// Failed to write boot parameters to guest memory.
@@ -42,19 +42,29 @@ pub enum Error {
     /// Memory error.
     Memory(vm_memory::Error),
     /// Serial creation error
-    SerialCreation(io::Error),
+    SerialCreation(devices::Error),
+    /// PTY creation error
+    PtyCreation,
+    /// PTY set up error
+    PtySetup,
     /// IRQ registration error
-    IrqRegister(io::Error),
+    IrqRegister(devices::Error),
     /// epoll creation error
     EpollError(io::Error),
     /// STDIN read error
     StdinRead(kvm_ioctls::Error),
     /// STDIN write error
     StdinWrite(vm_superio::serial::Error<io::Error>),
+    /// PTY read error
+    PtyRead(io::Error),
+    /// PTY serial write error
+    PtySerialWrite(vm_superio::serial::Error<io::Error>),
     /// Terminal configuration error
     TerminalConfigure(kvm_ioctls::Error),
     // Tap open error
     OpenTap(open_tap::Error),
+    // PTY write error
+    PtyRx(devices::Error),
 }
 
 /// Dedicated [`Result`](https://doc.rust-lang.org/std/result/) type.

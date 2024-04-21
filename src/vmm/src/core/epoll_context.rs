@@ -6,6 +6,8 @@ use std::io;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::result;
 
+use epoll::Events;
+
 pub(crate) const EPOLL_EVENTS_LEN: usize = 10;
 
 pub struct EpollContext {
@@ -19,11 +21,15 @@ impl EpollContext {
     }
 
     pub fn add_stdin(&self) -> result::Result<(), io::Error> {
+        self.add_fd(libc::STDIN_FILENO, epoll::Events::EPOLLIN)
+    }
+
+    pub fn add_fd(&self, fd: RawFd, event: Events) -> result::Result<(), io::Error> {
         epoll::ctl(
             self.raw_fd,
             epoll::ControlOptions::EPOLL_CTL_ADD,
-            libc::STDIN_FILENO,
-            epoll::Event::new(epoll::Events::EPOLLIN, libc::STDIN_FILENO as u64),
+            fd,
+            epoll::Event::new(event, fd as u64),
         )?;
 
         Ok(())

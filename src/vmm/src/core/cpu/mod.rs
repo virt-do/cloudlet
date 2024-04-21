@@ -1,10 +1,14 @@
 // Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
 
-use crate::core::devices::serial::{LumperSerial, SERIAL_PORT_BASE, SERIAL_PORT_LAST_REGISTER};
+use crate::core::devices::serial::{
+    LumperSerial, SERIAL2_PORT_BASE, SERIAL2_PORT_LAST_REGISTER, SERIAL_PORT_BASE,
+    SERIAL_PORT_LAST_REGISTER,
+};
 use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
 use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
 use std::convert::TryInto;
+use std::io::Stdout;
 use std::sync::{Arc, Mutex};
 use std::{io, process};
 use std::{result, u64};
@@ -17,6 +21,8 @@ mod gdt;
 use gdt::*;
 mod interrupts;
 use interrupts::*;
+
+use super::slip_pty::SlipPty;
 pub(crate) mod mpspec;
 pub(crate) mod mptable;
 pub(crate) mod msr_index;
@@ -67,16 +73,23 @@ pub(crate) struct Vcpu {
     /// KVM file descriptor for a vCPU.
     pub vcpu_fd: VcpuFd,
 
-    serial: Arc<Mutex<LumperSerial>>,
+    serial: Arc<Mutex<LumperSerial<Stdout>>>,
+    slip_pty: Arc<Mutex<SlipPty>>,
 }
 
 impl Vcpu {
     /// Create a new vCPU.
-    pub fn new(vm_fd: &VmFd, index: u64, serial: Arc<Mutex<LumperSerial>>) -> Result<Self> {
+    pub fn new(
+        vm_fd: &VmFd,
+        index: u64,
+        serial: Arc<Mutex<LumperSerial<Stdout>>>,
+        slip_pty: Arc<Mutex<SlipPty>>,
+    ) -> Result<Self> {
         Ok(Vcpu {
             index,
             vcpu_fd: vm_fd.create_vcpu(index).map_err(Error::KvmIoctl)?,
             serial,
+            slip_pty,
         })
     }
 
@@ -249,6 +262,20 @@ impl Vcpu {
                             )
                             .unwrap();
                     }
+                    SERIAL2_PORT_BASE..=SERIAL2_PORT_LAST_REGISTER => {
+                        self.slip_pty
+                            .lock()
+                            .unwrap()
+                            .serial_mut()
+                            .serial
+                            .write(
+                                (addr - SERIAL2_PORT_BASE)
+                                    .try_into()
+                                    .expect("Invalid serial register offset"),
+                                data[0],
+                            )
+                            .unwrap();
+                    }
                     KBD_CMD_IO_ADDR => {
                         if data[0] == KBD_RESET_CMD {
                             info!(?exit_reason, "Guest reset via keyboard controller. Bye!");
@@ -266,6 +293,13 @@ impl Vcpu {
                     SERIAL_PORT_BASE..=SERIAL_PORT_LAST_REGISTER => {
                         data[0] = self.serial.lock().unwrap().serial.read(
                             (addr - SERIAL_PORT_BASE)
+                                .try_into()
+                                .expect("Invalid serial register offset"),
+                        );
+                    }
+                    SERIAL2_PORT_BASE..=SERIAL2_PORT_LAST_REGISTER => {
+                        data[0] = self.slip_pty.lock().unwrap().serial_mut().serial.read(
+                            (addr - SERIAL2_PORT_BASE)
                                 .try_into()
                                 .expect("Invalid serial register offset"),
                         );
