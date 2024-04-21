@@ -8,7 +8,7 @@ use crate::core::{Error, Result};
 use kvm_bindings::{kvm_userspace_memory_region, KVM_MAX_CPUID_ENTRIES};
 use kvm_ioctls::{Kvm, VmFd};
 use linux_loader::loader::KernelLoaderResult;
-use std::io;
+use std::io::{self, stdout, Stdout};
 use std::net::Ipv4Addr;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
@@ -21,6 +21,7 @@ use vmm_sys_util::terminal::Terminal;
 
 use super::network::open_tap::open_tap;
 use super::network::tap::Tap;
+use super::slip_pty::SlipPty;
 
 pub struct VMM {
     vm_fd: VmFd,
@@ -29,8 +30,8 @@ pub struct VMM {
     vcpus: Vec<Vcpu>,
     _tap: Tap,
 
-    serial: Arc<Mutex<LumperSerial>>,
-    serial2: Arc<Mutex<LumperSerial>>,
+    serial: Arc<Mutex<LumperSerial<Stdout>>>,
+    slip_pty: Arc<Mutex<SlipPty>>,
     epoll: EpollContext,
 }
 
@@ -44,9 +45,6 @@ impl VMM {
         // KVM returns a file descriptor to the VM object.
         let vm_fd = kvm.create_vm().map_err(Error::KvmIoctl)?;
 
-        let epoll = EpollContext::new().map_err(Error::EpollError)?;
-        epoll.add_stdin().map_err(Error::EpollError)?;
-
         let tap = open_tap(
             None,
             Some(tap_ip_addr),
@@ -57,6 +55,23 @@ impl VMM {
         )
         .map_err(Error::OpenTap)?;
 
+        let slip_pty = SlipPty::new()?;
+
+        let epoll = EpollContext::new().map_err(Error::EpollError)?;
+        epoll.add_stdin().map_err(Error::EpollError)?;
+        epoll
+            .add_fd(
+                slip_pty.pty_master_fd(),
+                epoll::Events::EPOLLIN | epoll::Events::EPOLLET,
+            )
+            .map_err(Error::EpollError)?;
+        epoll
+            .add_fd(
+                slip_pty.serial().in_buffer_empty_eventfd().as_raw_fd(),
+                epoll::Events::EPOLLIN | epoll::Events::EPOLLET,
+            )
+            .map_err(Error::EpollError)?;
+
         let vmm = VMM {
             vm_fd,
             kvm,
@@ -64,11 +79,9 @@ impl VMM {
             vcpus: vec![],
             _tap: tap,
             serial: Arc::new(Mutex::new(
-                LumperSerial::new().map_err(Error::SerialCreation)?,
+                LumperSerial::new(stdout()).map_err(Error::SerialCreation)?,
             )),
-            serial2: Arc::new(Mutex::new(
-                LumperSerial::new().map_err(Error::SerialCreation)?,
-            )),
+            slip_pty: Arc::new(Mutex::new(slip_pty)),
             epoll,
         };
 
@@ -131,9 +144,10 @@ impl VMM {
         self.vm_fd
             .register_irqfd(
                 &self
-                    .serial2
+                    .slip_pty
                     .lock()
                     .unwrap()
+                    .serial()
                     .eventfd()
                     .map_err(Error::IrqRegister)?,
                 3,
@@ -157,7 +171,7 @@ impl VMM {
                 &self.vm_fd,
                 index.into(),
                 Arc::clone(&self.serial),
-                Arc::clone(&self.serial2),
+                Arc::clone(&self.slip_pty),
             )
             .map_err(Error::Vcpu)?;
 
@@ -213,6 +227,7 @@ impl VMM {
                 epoll::wait(epoll_fd, -1, &mut events[..]).map_err(Error::EpollError)?;
 
             for event in events.iter().take(num_events) {
+                let event_evts = epoll::Events::from_bits_truncate(event.events);
                 let event_data = event.data as RawFd;
 
                 if let libc::STDIN_FILENO = event_data {
@@ -226,6 +241,25 @@ impl VMM {
                         .serial
                         .enqueue_raw_bytes(&out[..count])
                         .map_err(Error::StdinWrite)?;
+                } else if event_evts.intersects(epoll::Events::EPOLLIN)
+                    && event_data == self.slip_pty.lock().unwrap().pty_master_fd()
+                {
+                    self.slip_pty.lock().unwrap().handle_master_rx()?;
+                } else if event_data
+                    == self
+                        .slip_pty
+                        .lock()
+                        .unwrap()
+                        .serial()
+                        .in_buffer_empty_eventfd()
+                        .as_raw_fd()
+                {
+                    self.slip_pty
+                        .lock()
+                        .unwrap()
+                        .serial_mut()
+                        .flush_in_buffer()
+                        .map_err(Error::PtyRx)?;
                 }
             }
         }
