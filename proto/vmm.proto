@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package vmmorchestrator;
+
+enum Language {
+  PYTHON = 0;
+  NODE = 1;
+  RUST = 2;
+}
+
+enum LogLevel {
+  DEBUG = 0;
+  INFO = 1;
+  WARN = 2;
+  ERROR = 3;
+}
+
+service VmmService {
+  rpc Run (RunVmmRequest) returns (RunVmmResponse);
+}
+
+message RunVmmRequest {
+
+  Language language = 1;
+  string code = 2;
+  string env = 3;
+  LogLevel log_level = 4;
+
+}
+
+message RunVmmResponse {
+}

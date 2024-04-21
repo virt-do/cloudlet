@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "shared_models"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,11 +7,10 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.3", features = ["derive"] }
-toml = "0.8.12"
-tokio = { version = "1.36.0", features = ["full"] }
 serde = { version = "1.0.197", features = ["derive"] }
 serde_yaml = "0.9.34"
-schemars = "0.8.16"
 serde_json = "1.0.115"
-reqwest = "0.12.3"
-shared_models = { path="../shared-models" }
+
+[lib]
+name = "shared_models"
+path = "src/lib.rs"

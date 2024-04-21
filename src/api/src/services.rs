@@ -1,28 +1,29 @@
-use actix_web::{get, post, web, HttpResponse, Responder};
-
-#[post("/configuration")]
-pub async fn configuration(req_body: String) -> impl Responder {
-    // TODO: Use the body to create the vm configuration
-    HttpResponse::Ok().body(req_body)
-}
+use crate::client::vmmorchestrator::RunVmmRequest;
+use crate::client::VmmClient;
+use actix_web::{post, web, HttpResponse, Responder};
+use shared_models::CloudletDtoRequest;
 
 #[post("/run")]
-pub async fn run(req_body: String) -> impl Responder {
-    // TODO: Use the body id to start the fm
-    HttpResponse::Ok().body(req_body)
-}
+pub async fn run(req_body: web::Json<CloudletDtoRequest>) -> impl Responder {
+    let req = req_body.into_inner();
+    let grpc_client = VmmClient::new().await;
 
-#[get("/logs/{id}")]
-pub async fn logs(id: web::Path<String>) -> HttpResponse {
-    // TODO: maybe not close the stream and keep sending the logs
-    HttpResponse::Ok().body(format!("Logs here: {}", &id))
-}
+    let vmm_request = RunVmmRequest {
+        code: req.code,
+        env: req.env,
+        language: req.language as i32,
+        log_level: req.log_level as i32,
+    };
 
-#[get("/metrics/{id}")]
-pub async fn metrics(id: web::Path<String>) -> HttpResponse {
-    // TODO: Get the metrics for a VM with the given ID
-
-    HttpResponse::Ok().body(format!("Metrics here: {}", &id))
+    match grpc_client {
+        Ok(mut client) => {
+            println!("Successfully connected to VMM service");
+            client.run_vmm(vmm_request).await;
+            HttpResponse::Ok().body("Successfully ran VMM")
+        }
+        Err(e) => HttpResponse::InternalServerError()
+            .body("Failed to connect to VMM service with error: ".to_string() + &e.to_string()),
+    }
 }
 
 #[post("/shutdown")]

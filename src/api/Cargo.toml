@@ -8,3 +8,9 @@ edition = "2021"
 [dependencies]
 actix-web = "4.5.1"
 serde = "1.0.197"
+tonic = "0.9"
+prost = "0.11"
+shared_models = { path="../shared-models" }
+
+[build-dependencies]
+tonic-build = "0.9"
