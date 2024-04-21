@@ -1,6 +1,5 @@
 use tonic::transport::Channel;
 use vmmorchestrator::vmm_service_client::VmmServiceClient;
-use vmmorchestrator::{Language, LogLevel};
 
 pub mod vmmorchestrator {
     tonic::include_proto!("vmmorchestrator");
@@ -19,14 +18,8 @@ impl VmmClient {
         Ok(VmmClient { client })
     }
 
-    pub async fn run_vmm(&mut self) {
-        let request = tonic::Request::new(vmmorchestrator::RunVmmRequest {
-            language: Language::Rust as i32,
-            env: "fn main() { println!(\"Hello, World!\"); }".to_string(),
-            code: "fn main() { println!(\"Hello, World!\"); }".to_string(),
-            log_level: LogLevel::Info as i32,
-        });
-
+    pub async fn run_vmm(&mut self, request: vmmorchestrator::RunVmmRequest) {
+        let request = tonic::Request::new(request);
         let response = self.client.run(request).await.unwrap();
         println!("RESPONSE={:?}", response);
     }

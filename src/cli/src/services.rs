@@ -1,23 +1,18 @@
-use crate::types::{Language, LogLevel, YamlConfigFile};
-use crate::utils::read_file;
+use crate::utils::ConfigFileHandler;
 use reqwest::Client;
-use serde::Serialize;
+use shared_models::{CloudletDtoRequest, YamlClientConfigFile};
 use std::error::Error;
-#[derive(Serialize, Debug)]
-pub struct HttpVmmRequest {
-    pub language: Language,
-    pub env: String,
-    pub code: String,
-    pub log_level: LogLevel,
-}
+pub struct CloudletClient {}
 
-impl HttpVmmRequest {
-    pub fn new(config: YamlConfigFile) -> Self {
-        let code: String = read_file(&config.code_path).expect("Error while reading the code file");
-        let env = read_file(&config.env_path).expect("Error while reading the environment file");
+impl CloudletClient {
+    pub fn new_cloudlet_config(config: YamlClientConfigFile) -> CloudletDtoRequest {
+        let code: String = ConfigFileHandler::read_file(&config.code_path)
+            .expect("Error while reading the code file");
+        let env = ConfigFileHandler::read_file(&config.env_path)
+            .expect("Error while reading the environment file");
         let language = config.language;
         let log_level = config.log_level;
-        HttpVmmRequest {
+        CloudletDtoRequest {
             language,
             env,
             code,
@@ -25,16 +20,20 @@ impl HttpVmmRequest {
         }
     }
 
-    pub async fn post(request: HttpVmmRequest) -> Result<(), Box<dyn Error>> {
+    pub async fn run(request: CloudletDtoRequest) -> Result<(), Box<dyn Error>> {
         let client = Client::new();
+        let json = serde_json::to_string(&request)?;
+        println!("REQUEST : {:?}", request);
         let res = client
             .post("http://127.0.0.1:3000/run")
-            .body(serde_json::to_string(&request)?)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(json)
             .send()
             .await?;
-        println!("Response Status: {}", res.status());
-        let body = res.text().await?;
-        println!("Response body: {}", body);
-        Ok(())
+
+        match res.status().as_u16() {
+            200 => Ok(()),
+            _ => Err("Error while making the request".into()),
+        }
     }
 }
