@@ -7,10 +7,10 @@ use linux_loader::bootparam::boot_params;
 use linux_loader::cmdline::Cmdline;
 use linux_loader::configurator::{linux::LinuxBootConfigurator, BootConfigurator, BootParams};
 use linux_loader::loader::{elf::Elf, load_cmdline, KernelLoader, KernelLoaderResult};
-use std::fs::File;
+use std::fs::{self, File};
 use std::path::PathBuf;
 use std::result;
-use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap};
+use vm_memory::{Address, Bytes, GuestAddress, GuestMemory, GuestMemoryMmap};
 
 // x86_64 boot constants. See https://www.kernel.org/doc/Documentation/x86/boot.txt for the full
 // documentation.
@@ -98,6 +98,25 @@ pub fn build_bootparams(
     Ok(params)
 }
 
+/// Load the initramfs into guest memory. Returns a tuple containing the address
+/// where the initramfs was loaded, and its size.
+///
+/// # Arguments
+///
+/// * `guest_memory` - guest memory
+/// * `start_addr` - the address where to start looking for a place to store the initramfs
+/// * `data` - the initramfs data
+fn load_initramfs(mem: &GuestMemoryMmap, start_addr: u64, data: Vec<u8>) -> Result<(u32, u32)> {
+    let addr = GuestAddress(start_addr);
+
+    mem.checked_offset(addr, data.len())
+        .ok_or(Error::InitramfsLoad)?;
+    mem.write_slice(data.as_slice(), addr)
+        .map_err(|_| Error::InitramfsLoad)?;
+
+    Ok((addr.raw_value() as u32, data.len() as u32))
+}
+
 /// Set guest kernel up.
 ///
 /// # Arguments
@@ -107,6 +126,7 @@ pub fn build_bootparams(
 pub fn kernel_setup(
     guest_memory: &GuestMemoryMmap,
     kernel_path: PathBuf,
+    initramfs_path: Option<PathBuf>,
 ) -> Result<KernelLoaderResult> {
     let mut kernel_image = File::open(kernel_path).map_err(Error::IO)?;
     let zero_page_addr = GuestAddress(ZEROPG_START);
@@ -137,6 +157,18 @@ pub fn kernel_setup(
         &cmdline,
     )
     .map_err(Error::KernelLoad)?;
+
+    // Handle the initramfs.
+    if let Some(initramfs_path) = initramfs_path {
+        // Load the initramfs into guest memory.
+        let initramfs = fs::read(initramfs_path).map_err(Error::IO)?;
+        let (initramfs_addr, initramfs_size) =
+            load_initramfs(guest_memory, kernel_load.kernel_end, initramfs)?;
+
+        // Add the initramfs to the boot parameters.
+        bootparams.hdr.ramdisk_image = initramfs_addr;
+        bootparams.hdr.ramdisk_size = initramfs_size;
+    }
 
     // Write the boot parameters in the zeropage.
     LinuxBootConfigurator::write_bootparams::<GuestMemoryMmap>(
