@@ -18,3 +18,4 @@ serde_json = "1.0.115"
 signal-hook = "0.3.17"
 tar = "0.4.40"
 validator = { version = "0.17.0", features = ["derive"] }
+anyhow = "1.0.82"
