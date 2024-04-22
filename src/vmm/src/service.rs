@@ -57,8 +57,6 @@ impl VmmServiceTrait for VmmService {
         // Todo - Check if the initramfs for the specified language is on the system, else build it
         initramfs_path.push("./tools/rootfs/initramfs.img");
 
-        println!("Kernel path: {:?}", kernel_path);
-
         // // Create a new VMM
         let mut vmm =
             VMM::new(HOST_IP, HOST_NETMASK).map_err(VmmErrors::VmmNew)?;
