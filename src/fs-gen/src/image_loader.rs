@@ -10,13 +10,13 @@ pub fn download_image_fs(
     output_file: PathBuf,
 ) -> Result<Vec<PathBuf>, Box<dyn Error>> {
     // Get image's name and tag
-    let image_and_tag: Vec<&str> = image_name.split(":").collect();
-    let tag: &str;
-    if image_and_tag.len() < 2 {
-        tag = "latest"
+    let image_and_tag: Vec<&str> = image_name.split(':').collect();
+
+    let tag = if image_and_tag.len() < 2 {
+        "latest"
     } else {
-        tag = image_and_tag[1];
-    }
+        image_and_tag[1]
+    };
     let image_name = image_and_tag[0];
 
     // Download image manifest
@@ -81,7 +81,7 @@ fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value
     );
 
     let manifest_response = client
-        .get(&manifest_url)
+        .get(manifest_url)
         .header(
             "Accept",
             "application/vnd.docker.distribution.manifest.v2+json",
@@ -140,7 +140,7 @@ fn download_layers(
         let tar = GzDecoder::new(response);
 
         let mut output_path = PathBuf::new();
-        output_path.push(&output_dir);
+        output_path.push(output_dir);
         output_path.push(digest);
 
         unpack_tarball(tar, &output_path)?;
