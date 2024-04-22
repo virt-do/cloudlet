@@ -18,7 +18,7 @@ pub enum Commands {
     Cli(CliArguments),
     #[command(about = "Run a GRPC server listening for incoming requests.")]
     Grpc,
-}   
+}
 
 /// Run a VMM instance.
 #[derive(Parser, Debug)]

@@ -1,8 +1,12 @@
 use crate::args::{CliArgs, Commands};
 use clap::Parser;
-use tracing::info;
-use vmm::{core::{vmm::VMM}, service::{vmmorchestrator, VmmService}, VmmErrors};
 use tonic::transport::Server;
+use tracing::info;
+use vmm::{
+    core::vmm::VMM,
+    service::{vmmorchestrator, VmmService},
+    VmmErrors,
+};
 mod args;
 
 #[tokio::main]
@@ -23,27 +27,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         Commands::Grpc => {
             Server::builder()
-            .add_service(vmmorchestrator::vmm_service_server::VmmServiceServer::new(vmm_service))
-            .serve(addr)
-            .await?;
-
+                .add_service(vmmorchestrator::vmm_service_server::VmmServiceServer::new(
+                    vmm_service,
+                ))
+                .serve(addr)
+                .await?;
         }
         Commands::Cli(cli_args) => {
-            
             tracing_subscriber::fmt()
-            .with_max_level(cli_args.convert_log_to_tracing())
-            .init();
+                .with_max_level(cli_args.convert_log_to_tracing())
+                .init();
             // Create a new VMM
-            let mut vmm =
-                VMM::new(cli_args.network_host_ip, cli_args.network_host_netmask).map_err(VmmErrors::VmmNew).unwrap();
-        
-            vmm.configure(cli_args.cpus, cli_args.memory, &cli_args.kernel, &cli_args.initramfs)
-                .map_err(VmmErrors::VmmConfigure).unwrap();
-        
+            let mut vmm = VMM::new(cli_args.network_host_ip, cli_args.network_host_netmask)
+                .map_err(VmmErrors::VmmNew)
+                .unwrap();
+
+            vmm.configure(
+                cli_args.cpus,
+                cli_args.memory,
+                &cli_args.kernel,
+                &cli_args.initramfs,
+            )
+            .map_err(VmmErrors::VmmConfigure)
+            .unwrap();
+
             // Run the VMM
             vmm.run().map_err(VmmErrors::VmmRun).unwrap();
         }
     }
-  
+
     Ok(())
 }
