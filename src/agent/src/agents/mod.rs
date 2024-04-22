@@ -3,9 +3,16 @@ use serde::Deserialize;
 
 pub mod rust;
 
+#[derive(Debug, Clone)]
+pub struct AgentOutput {
+    pub exit_code: i32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
 pub trait Agent {
-    fn prepare(&self) -> AgentResult<()>;
-    fn run(&self) -> AgentResult<()>;
+    fn prepare(&self) -> AgentResult<AgentOutput>;
+    fn run(&self) -> AgentResult<AgentOutput>;
 }
 
 #[derive(Debug, Clone, Deserialize)]

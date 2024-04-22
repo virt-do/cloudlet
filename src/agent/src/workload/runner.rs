@@ -21,14 +21,17 @@ impl Runner {
     }
 
     pub fn run(&self) -> AgentResult<()> {
-        match self.config.action {
+        let result = match self.config.action {
             Action::Prepare => self.agent.prepare()?,
             Action::Run => self.agent.run()?,
             Action::PrepareAndRun => {
-                self.agent.prepare()?;
-                self.agent.run()?;
+                let res = self.agent.prepare()?;
+                println!("Prepare result {:?}", res);
+                self.agent.run()?
             }
-        }
+        };
+
+        println!("Result: {:?}", result);
 
         Ok(())
     }
