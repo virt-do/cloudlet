@@ -3,7 +3,7 @@ use crate::core::vmm::{self, VMM};
 use std::{convert::From, net::Ipv4Addr, path::{Path, PathBuf}, process::{Command, Stdio}};
 use crate::VmmErrors;
 use self::vmmorchestrator::{vmm_service_server::VmmService as VmmServiceTrait, RunVmmRequest, RunVmmResponse};
-use tracing::info;
+use tracing::{error, info};
 
 pub mod vmmorchestrator {
     tonic::include_proto!("vmmorchestrator");
@@ -36,8 +36,6 @@ impl VmmServiceTrait for VmmService {
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
         
         // Check if the kernel is on the system, else build it
-        println!("BEFORE");
-
         if !Path::new("./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin").exists() {
             info!("Kernel not found, building kernel");
             // Execute the script using sh and capture output and error streams
@@ -49,16 +47,15 @@ impl VmmServiceTrait for VmmService {
                 .expect("Failed to execute the kernel build script");
 
             // Print output and error streams
-            println!("Script output: {}", String::from_utf8_lossy(&output.stdout));
-            println!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
-
+            error!("Script output: {}", String::from_utf8_lossy(&output.stdout));
+            error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
         };
 
         let kernel_path = &Path::new("./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
         let mut initramfs_path: PathBuf = PathBuf::new(); 
 
         // Todo - Check if the initramfs for the specified language is on the system, else build it
-        initramfs_path.push("./initramfs.img"); // Append the path to the PathBuf
+        initramfs_path.push("./tools/rootfs/initramfs.img");
 
         println!("Kernel path: {:?}", kernel_path);
 
@@ -66,6 +63,7 @@ impl VmmServiceTrait for VmmService {
         let mut vmm =
             VMM::new(HOST_IP, HOST_NETMASK).map_err(VmmErrors::VmmNew)?;
 
+        // Configure the VMM parameters might need to be calculated rather than hardcoded
         vmm.configure(1, 512, &kernel_path, &Some(initramfs_path))
             .map_err(VmmErrors::VmmConfigure)?;
         // Run the VMM

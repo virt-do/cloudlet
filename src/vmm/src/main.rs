@@ -1,7 +1,7 @@
-use crate::args::{CliArgs, CliArguments, Commands};
+use crate::args::{CliArgs, Commands};
 use clap::Parser;
 use tracing::info;
-use vmm::{core::{self, vmm::VMM}, service::{vmmorchestrator, VmmService}, VmmErrors};
+use vmm::{core::{vmm::VMM}, service::{vmmorchestrator, VmmService}, VmmErrors};
 use tonic::transport::Server;
 mod args;
 
@@ -17,10 +17,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     let addr = "[::1]:50051".parse().unwrap();
-    let vmm_service = VmmService::default();
+    let vmm_service = VmmService;
 
     // check if the args is grpc or command
-
     match args.command {
         Commands::Grpc => {
             Server::builder()
@@ -29,8 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
 
         }
-        Commands::cli(CliArguments) => {
-            let cli_args = CliArguments::parse();
+        Commands::Cli(cli_args) => {
             
             tracing_subscriber::fmt()
             .with_max_level(cli_args.convert_log_to_tracing())
@@ -44,7 +42,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
             // Run the VMM
             vmm.run().map_err(VmmErrors::VmmRun).unwrap();
-        
         }
     }
   
