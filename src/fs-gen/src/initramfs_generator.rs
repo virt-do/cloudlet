@@ -4,9 +4,9 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-const INIT_FILE: &[u8;220] = b"#! /bin/sh
+const INIT_FILE: &[u8;211] = b"#! /bin/sh
 #
-# /init executable file in the initramfs
+# Cloudlet initramfs generation
 #
 mount -t devtmpfs dev /dev
 mount -t proc proc /proc
