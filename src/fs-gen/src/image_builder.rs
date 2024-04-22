@@ -1,7 +1,6 @@
 use std::{
-    fs::{self, File},
+    fs::{self},
     io::Result,
-    option,
     path::{Path, PathBuf},
     sync::Arc,
     thread,
@@ -13,7 +12,6 @@ use fuse_backend_rs::{
     passthrough::{self, PassthroughFs},
     transport::{FuseChannel, FuseSession},
 };
-use signal_hook::{consts::TERM_SIGNALS, iterator::Signals};
 
 pub struct FuseServer {
     server: Arc<Server<Arc<OverlayFs>>>,
