@@ -27,10 +27,12 @@ type BoxedLayer = Box<dyn Layer<Inode = u64, Handle = u64> + Send + Sync>;
 /// let passthrough_layer = new_passthroughfs_layer("/path/to/layer")
 /// ```
 fn new_passthroughfs_layer(rootdir: &str) -> Result<BoxedLayer> {
-    let mut config = passthrough::Config::default();
-    config.root_dir = String::from(rootdir);
-    config.xattr = true;
-    config.do_import = true;
+    let config = passthrough::Config {
+        root_dir: String::from(rootdir),
+        xattr: true,
+        do_import: true,
+        ..Default::default()
+    };
     let fs = Box::new(PassthroughFs::<()>::new(config)?);
     fs.import()
         .with_context(|| format!("Failed to create the passthrough layer: {}", rootdir))?;
@@ -67,10 +69,12 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path) -> Result<()> {
     ensure_folder_created(output_folder)?;
 
     // Setup the overlay fs config
-    let mut config = Config::default();
-    config.work = "/work".into();
-    config.mountpoint = output_folder.to_string_lossy().into();
-    config.do_import = true;
+    let config = Config {
+        work: "/work".into(),
+        mountpoint: output_folder.to_string_lossy().into(),
+        do_import: true,
+        ..Default::default()
+    };
 
     let fs = OverlayFs::new(None, lower_layers, config)
         .with_context(|| "Failed to construct the Overlay fs struct !".to_string())?;
