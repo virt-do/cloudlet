@@ -1,10 +1,10 @@
 use std::fs::{File, Permissions};
-use std::os::unix::fs::PermissionsExt;
 use std::io::Write;
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-const INIT_FILE: &[u8;211] = b"#! /bin/sh
+const INIT_FILE: &[u8; 211] = b"#! /bin/sh
 #
 # Cloudlet initramfs generation
 #
@@ -21,13 +21,15 @@ pub fn create_init_file(path: &Path) {
     let file_path = path.join("init");
     let mut file = File::create(file_path).unwrap();
 
-    file.write_all(INIT_FILE).expect("Could not write init file");
+    file.write_all(INIT_FILE)
+        .expect("Could not write init file");
     file.set_permissions(Permissions::from_mode(0o755)).unwrap();
 }
 
 pub fn generate_initramfs(root_directory: &Path, output: &Path) {
     let file = File::create(output).unwrap();
-    file.set_permissions(Permissions::from_mode(0o644)).expect("Could not set permissions");
+    file.set_permissions(Permissions::from_mode(0o644))
+        .expect("Could not set permissions");
 
     println!("Generating initramfs...");
 
@@ -38,7 +40,9 @@ pub fn generate_initramfs(root_directory: &Path, output: &Path) {
         .arg("find . -print0 | cpio -0 --create --owner=root:root --format=newc | xz -9 --format=lzma")
         .spawn()
         .expect("Failed to package initramfs");
-    command.wait().expect("Failed to wait for initramfs to finish");
+    command
+        .wait()
+        .expect("Failed to wait for initramfs to finish");
 
     println!("Initramfs generated!");
 }
