@@ -339,7 +339,7 @@ impl VMM {
     }
 
     pub fn configure_net_device(&mut self) -> Result<String> {
-        let _mem = Arc::new(self.guest_memory.clone());
+        let mem = Arc::new(self.guest_memory.clone());
         let range = if let Some(allocator) = &self.address_allocator {
             allocator
                 .to_owned()
@@ -353,7 +353,7 @@ impl VMM {
         let irq = self.irq_allocator.next_irq().unwrap();
 
         // !TODO: MMIO Device Discovery + MMIO Device Register Layout
-        let net = Net::new(range.len(), GuestAddress(range.start()), irq).unwrap();
+        let net = Net::new(range.len(), GuestAddress(range.start()), irq, mem).unwrap();
 
         Ok(net.get_vmmio_parameter())
     }
