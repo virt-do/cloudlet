@@ -1,17 +1,20 @@
 use std::{
-    fs::{self},
+    fs,
     path::{Path, PathBuf},
     sync::Arc,
     thread,
 };
 
-use anyhow::{Context, Result};
+use anyhow::anyhow;
+use anyhow::{Context, Ok, Result};
 use fuse_backend_rs::{
     api::{filesystem::Layer, server::Server},
     overlayfs::{config::Config, OverlayFs},
     passthrough::{self, PassthroughFs},
     transport::{FuseChannel, FuseSession},
 };
+
+static FILE_EXISTS_ERROR: i32 = 17;
 
 pub struct FuseServer {
     server: Arc<Server<Arc<OverlayFs>>>,
@@ -41,12 +44,19 @@ fn new_passthroughfs_layer(rootdir: &str) -> Result<BoxedLayer> {
 
 /// Ensure a destination folder is created
 fn ensure_folder_created(output_folder: &Path) -> Result<()> {
-    fs::create_dir(output_folder).with_context(|| {
-        format!(
-            "Failed to ensure folder creation: {}",
-            output_folder.to_string_lossy()
-        )
-    })
+    let result = fs::create_dir(output_folder);
+
+    // If the file already exists, we're fine
+    if result.is_err()
+        && result
+            .unwrap_err()
+            .raw_os_error()
+            .is_some_and(|err_val| err_val != FILE_EXISTS_ERROR)
+    {
+        return Err(anyhow!("Failed to create folder"));
+    }
+
+    Ok(())
 }
 
 /// Merges all the layers into a single folder for further manipulation
