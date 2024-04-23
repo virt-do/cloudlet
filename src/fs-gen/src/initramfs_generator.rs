@@ -1,8 +1,9 @@
-use std::fs::{File, Permissions, copy};
-use std::io::Write;
+use std::fs::{File, Permissions, copy as fscopy};
+use std::io::{Write, copy as iocopy};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use fuse_backend_rs::api::filesystem::ZeroCopyReader;
 
 const INIT_FILE: &str = include_str!("../resources/initfile");
 
@@ -11,7 +12,7 @@ pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
 
     if let Some(p) = initfile {
         // if there is a given initfile, we copy it into the folder
-        copy(p, destination).expect("Could not copy initfile");
+        fscopy(p, destination).expect("Could not copy initfile");
     } else {
         // if there is none, write the default init file
         let mut file = File::create(destination).unwrap();
@@ -19,6 +20,14 @@ pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
         file.write_all(INIT_FILE.as_bytes())
             .expect("Could not write init file");
     }
+}
+
+pub fn insert_agent(destination: &Path, agent_path: PathBuf) {
+    let mut file = File::create(destination.join("agent")).unwrap();
+    file.set_permissions(Permissions::from_mode(0o755)).unwrap();
+
+    let mut agent = File::open(agent_path).unwrap();
+    iocopy(&mut agent, &mut file).expect("Could not copy agent");
 }
 
 pub fn generate_initramfs(root_directory: &Path, output: &Path) {

@@ -1,6 +1,6 @@
 use std::{fs::remove_dir_all, path::Path};
 
-use crate::initramfs_generator::{create_init_file, generate_initramfs};
+use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use image_builder::merge_layer;
 
 mod cli_args;
@@ -33,6 +33,8 @@ fn main() {
 
             merge_layer(&layers_paths, path, &overlay_subdir).expect("Merging layers failed");
             create_init_file(path, args.initfile_path);
+            insert_agent(path, args.agent_host_path);
+
             generate_initramfs(path, Path::new(args.output_file.as_path()));
         }
     }
