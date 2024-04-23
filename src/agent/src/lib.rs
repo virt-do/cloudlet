@@ -14,3 +14,7 @@ pub enum AgentError {
 }
 
 pub type AgentResult<T> = Result<T, AgentError>;
+
+pub mod agent {
+    tonic::include_proto!("cloudlet.agent");
+}

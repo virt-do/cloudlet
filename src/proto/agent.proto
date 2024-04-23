@@ -1,0 +1,31 @@
+syntax = "proto3";
+package cloudlet.agent;
+import "google/protobuf/empty.proto";
+
+message WorkloadRequest {}
+
+message WorkloadResponse {
+  enum Stage {
+    PENDING = 0;
+    BUILDING = 1;
+    RUNNING = 2;
+    DONE = 3;
+    FAILED = 4;
+    DEBUG = 5;
+  }
+
+  string stdout = 1;
+  string stderr = 2;
+  int32 exit_code = 3;
+}
+
+message SignalRequest {
+  enum Signal {
+    KILL = 0;
+  }
+}
+
+service Workload {
+  rpc ExecuteWorkload(WorkloadRequest) returns (stream WorkloadResponse) {}
+  rpc Signal(SignalRequest) returns (google.protobuf.Empty) {}
+}
