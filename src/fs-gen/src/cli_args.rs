@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 
 // So, for any of you who may be scared, this is the regex from the OCI Distribution Sepcification for the image name + the tag
 static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*:[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}").unwrap()
+    Regex::new(r"[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*(?::[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127})?").unwrap()
 });
 
 /// Convert an OCI image into a CPIO file
