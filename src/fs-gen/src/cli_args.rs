@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use clap::{command, error::ErrorKind, CommandFactory, Parser};
+use clap::{command, error::ErrorKind, CommandFactory, Parser, ArgAction};
 use regex::Regex;
 
 use once_cell::sync::Lazy;
@@ -30,6 +30,9 @@ pub struct CliArgs {
 
     #[arg(short='i', long="init", default_value=None)]
     pub initfile_path: Option<PathBuf>,
+
+    #[arg(short='d', long="debug", action=ArgAction::SetTrue)]
+    pub debug: bool,
 }
 
 impl CliArgs {

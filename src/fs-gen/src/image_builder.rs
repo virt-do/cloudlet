@@ -13,6 +13,7 @@ use fuse_backend_rs::{
     passthrough::{self, PassthroughFs},
     transport::{FuseChannel, FuseSession},
 };
+use tracing::{debug, warn};
 
 static FILE_EXISTS_ERROR: i32 = 17;
 
@@ -116,7 +117,7 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
         let _ = server.svc_loop();
     });
 
-    println!("copy starting !");
+    debug!("Starting copy...");
     //So now we need to copy the files
     dircpy::copy_dir(mountpoint, output_folder).with_context(|| {
         format!(
@@ -124,7 +125,7 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
             output_folder.to_string_lossy()
         )
     })?;
-    println!("copy finished");
+    debug!("Copy finished!");
 
     // Unmount sessions so it can be re-used in later executions of the program
     se.wake()
@@ -138,9 +139,8 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
 
 impl FuseServer {
     /// Run a loop to execute requests from the FUSE session
-    ///
     pub fn svc_loop(&mut self) -> Result<()> {
-        println!("entering server loop");
+        debug!("entering server loop");
         loop {
             let value = self
                 .ch
@@ -148,7 +148,7 @@ impl FuseServer {
                 .with_context(|| "Failed to get message from fuse session".to_string())?;
 
             if value.is_none() {
-                println!("fuse server exits");
+                debug!("fuse server exits");
                 break;
             }
 
@@ -164,7 +164,7 @@ impl FuseServer {
                         break;
                     }
                     _ => {
-                        print!("Handling fuse message failed");
+                        warn!("Handling fuse message failed");
                         continue;
                     }
                 }
