@@ -2,9 +2,9 @@ syntax = "proto3";
 package cloudlet.agent;
 import "google/protobuf/empty.proto";
 
-message WorkloadRequest {}
+message ExecuteRequest {}
 
-message WorkloadResponse {
+message ExecuteResponse {
   enum Stage {
     PENDING = 0;
     BUILDING = 1;
@@ -25,7 +25,7 @@ message SignalRequest {
   }
 }
 
-service Workload {
-  rpc ExecuteWorkload(WorkloadRequest) returns (stream WorkloadResponse) {}
+service WorkloadRunner {
+  rpc Execute(ExecuteRequest) returns (stream ExecuteResponse) {}
   rpc Signal(SignalRequest) returns (google.protobuf.Empty) {}
 }
