@@ -2,6 +2,10 @@ workload-name = "fibonacci"
 language = "rust"
 action = "prepare-and-run"
 
+[server]
+address = "localhost"
+port = 50051
+
 [build]
 source-code-path = "CHANGEME/cloudlet/src/agent/examples/main.rs"
 release = true

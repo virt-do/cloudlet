@@ -17,13 +17,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let config = Config::from_file(&args.config).unwrap();
+
+    let bind_address = format!("{}:{}", config.server.address, config.server.port)
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
+
     let runner = Runner::new(config);
 
     let server = WorkloadRunnerService::new(runner);
 
     Server::builder()
         .add_service(WorkloadRunnerServer::new(server))
-        .serve("[::1]:50051".to_socket_addrs().unwrap().next().unwrap())
+        .serve(bind_address)
         .await
         .unwrap();
 
