@@ -4,18 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const INIT_FILE: &[u8; 210] = b"#!/bin/sh
-#
-# Cloudlet initramfs generation
-#
-mount -t devtmpfs dev /dev
-mount -t proc proc /proc
-mount -t sysfs sysfs /sys
-ip link set up dev lo
-
-exec /sbin/getty -n -l /bin/sh 115200 /dev/console
-poweroff -f
-";
+const INIT_FILE: &str = include_str!("../resources/initfile");
 
 pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
     let destination = path.join("init");
@@ -27,7 +16,7 @@ pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
         // if there is none, write the default init file
         let mut file = File::create(destination).unwrap();
         file.set_permissions(Permissions::from_mode(0o755)).unwrap();
-        file.write_all(INIT_FILE)
+        file.write_all(INIT_FILE.as_bytes())
             .expect("Could not write init file");
     }
 }
