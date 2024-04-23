@@ -4,6 +4,7 @@ use std::error::Error;
 use std::fs::create_dir;
 use std::path::PathBuf;
 use tar::Archive;
+use tracing::{debug, info};
 
 pub fn download_image_fs(
     image_name: &str,
@@ -33,7 +34,8 @@ pub fn download_image_fs(
                 image_name, tag
             ))?,
             Some(m) => {
-                println!("Manifest list found. Looking for an amd64 manifest...");
+                debug!("Manifest list found. Looking for an amd64 manifest...");
+                // TODO: implement other than amd64?
                 // Get a manifest for amd64 architecture from the manifest list
                 let amd64_manifest = m.iter().find(|manifest| {
                     manifest["platform"].as_object().unwrap()["architecture"]
@@ -45,7 +47,8 @@ pub fn download_image_fs(
                 match amd64_manifest {
                     None => Err("This image doesn't support amd64 architecture")?,
                     Some(m) => {
-                        println!("Downloading manifest for amd64 architecture...");
+                        info!("Downloading image...");
+                        debug!("Downloading manifest for amd64 architecture...");
                         manifest_json =
                             download_manifest(image_name, m["digest"].as_str().unwrap())?;
                         layers = manifest_json["layers"].as_array();
@@ -96,7 +99,10 @@ fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value
 
     let manifest_json: serde_json::Value = manifest_response.json()?;
 
-    println!("{}", manifest_json);
+    debug!(
+        manifest = ?manifest_json,
+        "downloaded manifest: "
+    );
 
     Ok(manifest_json)
 }
@@ -123,7 +129,7 @@ fn download_layers(
 
     let mut layer_paths = Vec::new();
 
-    println!("Downloading and unpacking layers:");
+    debug!("Downloading and unpacking layers...");
 
     // Download and unpack each layer
     for layer in layers {
@@ -135,7 +141,7 @@ fn download_layers(
 
         let response = client.get(&layer_url).bearer_auth(token).send()?;
 
-        print!(" - {}", digest);
+        debug!("starting to decode layer with digest '{}'", digest);
 
         let tar = GzDecoder::new(response);
 
@@ -144,8 +150,11 @@ fn download_layers(
         output_path.push(digest);
 
         unpack_tarball(tar, &output_path)?;
-        println!(" - unpacked");
+        debug!("layer '{}' unpacked", digest);
         layer_paths.push(output_path);
     }
+
+    info!("Layers downloaded successfully!");
+
     Ok(layer_paths)
 }

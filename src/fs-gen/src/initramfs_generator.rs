@@ -3,11 +3,13 @@ use std::io::{Write, copy as iocopy};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use fuse_backend_rs::api::filesystem::ZeroCopyReader;
+use tracing::info;
 
 const INIT_FILE: &str = include_str!("../resources/initfile");
 
 pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
+    info!("Writing initfile...");
+
     let destination = path.join("init");
 
     if let Some(p) = initfile {
@@ -20,14 +22,20 @@ pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
         file.write_all(INIT_FILE.as_bytes())
             .expect("Could not write init file");
     }
+
+    info!("Initfile written!");
 }
 
 pub fn insert_agent(destination: &Path, agent_path: PathBuf) {
+    info!("Inserting agent into fs...");
+
     let mut file = File::create(destination.join("agent")).unwrap();
     file.set_permissions(Permissions::from_mode(0o755)).unwrap();
 
     let mut agent = File::open(agent_path).unwrap();
     iocopy(&mut agent, &mut file).expect("Could not copy agent");
+
+    info!("Agent inserted!");
 }
 
 pub fn generate_initramfs(root_directory: &Path, output: &Path) {
@@ -35,7 +43,7 @@ pub fn generate_initramfs(root_directory: &Path, output: &Path) {
     file.set_permissions(Permissions::from_mode(0o644))
         .expect("Could not set permissions");
 
-    println!("Generating initramfs...");
+    info!("Generating initramfs...");
 
     let mut command = Command::new("sh")
         .current_dir(root_directory)
@@ -48,5 +56,5 @@ pub fn generate_initramfs(root_directory: &Path, output: &Path) {
         .wait()
         .expect("Failed to wait for initramfs to finish");
 
-    println!("Initramfs generated!");
+    info!("Initramfs generated!");
 }
