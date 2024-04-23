@@ -17,6 +17,9 @@ pub struct CliArgs {
     /// The name of the image to download
     pub image_name: String,
 
+    /// The host path to the guest agent binary
+    pub agent_host_path: PathBuf,
+
     /// The path to the output file
     #[arg(short='o', long="output", default_value=get_default_output_file().into_os_string())]
     pub output_file: PathBuf,
@@ -25,8 +28,8 @@ pub struct CliArgs {
     #[arg(short='t', long="tempdir", default_value=get_default_temp_directory().into_os_string())]
     pub temp_directory: PathBuf,
 
-    /// The host path to the guest agent binary
-    pub agent_host_path: PathBuf,
+    #[arg(short='i', long="init", default_value=None)]
+    pub initfile_path: Option<PathBuf>,
 }
 
 impl CliArgs {

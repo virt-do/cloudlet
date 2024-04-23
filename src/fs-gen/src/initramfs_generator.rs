@@ -1,10 +1,10 @@
-use std::fs::{File, Permissions};
+use std::fs::{File, Permissions, copy};
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-const INIT_FILE: &[u8; 211] = b"#! /bin/sh
+const INIT_FILE: &[u8; 210] = b"#!/bin/sh
 #
 # Cloudlet initramfs generation
 #
@@ -17,13 +17,19 @@ exec /sbin/getty -n -l /bin/sh 115200 /dev/console
 poweroff -f
 ";
 
-pub fn create_init_file(path: &Path) {
-    let file_path = path.join("init");
-    let mut file = File::create(file_path).unwrap();
+pub fn create_init_file(path: &Path, initfile: Option<PathBuf>) {
+    let destination = path.join("init");
 
-    file.write_all(INIT_FILE)
-        .expect("Could not write init file");
-    file.set_permissions(Permissions::from_mode(0o755)).unwrap();
+    if let Some(p) = initfile {
+        // if there is a given initfile, we copy it into the folder
+        copy(p, destination).expect("Could not copy initfile");
+    } else {
+        // if there is none, write the default init file
+        let mut file = File::create(destination).unwrap();
+        file.set_permissions(Permissions::from_mode(0o755)).unwrap();
+        file.write_all(INIT_FILE)
+            .expect("Could not write init file");
+    }
 }
 
 pub fn generate_initramfs(root_directory: &Path, output: &Path) {
