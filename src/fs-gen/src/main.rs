@@ -13,6 +13,7 @@ fn main() {
     println!("Hello, world!, {:?}", args);
 
     let layers_subdir = args.temp_directory.clone().join("layers/");
+    let output_subdir = args.temp_directory.clone().join("output/");
     let overlay_subdir = args.temp_directory.clone().join("overlay/");
 
     // TODO: better organise layers and OverlayFS build in the temp directory
@@ -28,10 +29,9 @@ fn main() {
             }
 
             // FIXME: use a subdir of the temp directory instead
-            let path = Path::new(overlay_subdir.as_path());
+            let path = Path::new(output_subdir.as_path());
 
-            merge_layer(&layers_paths, path, &args.temp_directory.clone())
-                .expect("Merging layers failed");
+            merge_layer(&layers_paths, path, &overlay_subdir).expect("Merging layers failed");
             create_init_file(path);
             generate_initramfs(path, Path::new(args.output_file.as_path()));
         }
