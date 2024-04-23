@@ -1,10 +1,7 @@
 use agents::AgentOutput;
 
 mod agents;
-pub mod workload {
-    pub mod config;
-    pub mod runner;
-}
+pub mod workload;
 
 #[derive(Debug)]
 pub enum AgentError {

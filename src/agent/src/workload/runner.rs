@@ -1,11 +1,13 @@
-use super::config::{Action, Config};
 use crate::{
     agents::{rust, Agent, Language},
+    workload::config::Action,
     AgentResult,
 };
 
 #[cfg(feature = "debug-agent")]
 use crate::agents::debug;
+
+use super::config::Config;
 
 /// Runner for a workload.  
 /// Will execute the workload based on the inner agent (language).
