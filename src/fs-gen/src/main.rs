@@ -30,7 +30,8 @@ fn main() {
             // FIXME: use a subdir of the temp directory instead
             let path = Path::new(overlay_subdir.as_path());
 
-            merge_layer(&layers_paths, path).expect("Merging layers failed");
+            merge_layer(&layers_paths, path, &args.temp_directory.clone())
+                .expect("Merging layers failed");
             create_init_file(path);
             generate_initramfs(path, Path::new(args.output_file.as_path()));
         }
