@@ -47,13 +47,18 @@ fn ensure_folder_created(output_folder: &Path) -> Result<()> {
     let result = fs::create_dir(output_folder);
 
     // If the file already exists, we're fine
-    if result.is_err()
-        && result
-            .unwrap_err()
+    if result.is_err() {
+        let err = result.unwrap_err();
+
+        if err
             .raw_os_error()
             .is_some_and(|err_val| err_val != FILE_EXISTS_ERROR)
-    {
-        return Err(anyhow!("Failed to create folder"));
+        {
+            return Err(anyhow!(err)).context(format!(
+                "Failed to create folder: {}",
+                output_folder.to_string_lossy()
+            ));
+        }
     }
 
     Ok(())
@@ -63,16 +68,17 @@ fn ensure_folder_created(output_folder: &Path) -> Result<()> {
 /// It works by instantiating an overlay fs via FUSE then copying the files to the desired target
 /// # Usage
 /// ```
-/// merge_layer(vec!["source/layer_1", "source/layer_2"], "/tmp/fused_layers")
+/// merge_layer(vec!["source/layer_1", "source/layer_2"], "/tmp/fused_layers", "/tmp")
 /// ```
-pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path) -> Result<()> {
+pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Path) -> Result<()> {
     // Stack all lower layers
     let mut lower_layers = Vec::new();
     for lower in blob_paths {
         lower_layers.push(Arc::new(new_passthroughfs_layer(&lower.to_string_lossy())?));
     }
 
-    let mountpoint = Path::new("/tmp/cloudlet_internal");
+    let binding = tmp_folder.join("overlayfs_mountpoint");
+    let mountpoint = binding.as_path();
     let fs_name = "cloudlet_overlay";
 
     ensure_folder_created(mountpoint)?;
@@ -80,7 +86,7 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path) -> Result<()> {
 
     // Setup the overlay fs config
     let config = Config {
-        work: "/work".into(),
+        work: tmp_folder.join("work").to_string_lossy().into(),
         mountpoint: output_folder.to_string_lossy().into(),
         do_import: true,
         ..Default::default()
