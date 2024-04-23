@@ -44,7 +44,7 @@ fn new_passthroughfs_layer(rootdir: &str) -> Result<BoxedLayer> {
 
 /// Ensure a destination folder is created
 fn ensure_folder_created(output_folder: &Path) -> Result<()> {
-    let result = fs::create_dir(output_folder);
+    let result = fs::create_dir_all(output_folder);
 
     // If the file already exists, we're fine
     if result.is_err() {
