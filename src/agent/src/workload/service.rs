@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{process::exit, sync::Arc};
 
 use crate::agent::{self, ExecuteRequest, ExecuteResponse, SignalRequest};
 
@@ -31,7 +31,7 @@ impl WorkloadRunner for WorkloadRunnerService {
     async fn execute(&self, _: Request<ExecuteRequest>) -> Result<Self::ExecuteStream> {
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
-        // We assumer only one request at a time
+        // We assume there's only one request at a time
         let runner = match self.runner.try_lock() {
             Ok(runner) => runner,
             Err(_) => {
@@ -62,6 +62,6 @@ impl WorkloadRunner for WorkloadRunnerService {
     }
 
     async fn signal(&self, _: Request<SignalRequest>) -> Result<()> {
-        panic!("Not implemented")
+        unreachable!();
     }
 }
