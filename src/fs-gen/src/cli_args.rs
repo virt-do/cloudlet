@@ -66,13 +66,12 @@ impl CliArgs {
     }
 }
 
-/// Get the default output path for the cpio file.
+/// Get the default temporary directory for the current execution.
 fn get_default_temp_directory() -> PathBuf {
-    let mut path = env::current_dir().unwrap();
-    path.push(".cloudlet_temp/");
-    path
+    PathBuf::from("/tmp/cloudlet-fs-gen")
 }
 
+/// Get the default output file path for the generated initramfs.
 fn get_default_output_file() -> PathBuf {
     let mut path = env::current_dir().unwrap();
     path.push("initramfs.img");
