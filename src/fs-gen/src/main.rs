@@ -1,6 +1,5 @@
 use std::{fs::remove_dir_all, path::Path};
 use tracing::{debug, error, info, Level};
-use tracing_subscriber;
 
 use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use image_builder::merge_layer;
