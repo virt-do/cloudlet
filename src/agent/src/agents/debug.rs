@@ -30,7 +30,7 @@ impl Agent for DebugAgent {
                 SystemTime::now(),
             ),
         )
-            .expect("Unable to write debug.txt file");
+        .expect("Unable to write debug.txt file");
 
         Ok(AgentOutput {
             exit_code: 0,
