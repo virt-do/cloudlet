@@ -1,6 +1,8 @@
 use std::{fs::remove_dir_all, path::Path};
+use std::path::PathBuf;
 use tracing::{debug, error, info, Level};
 use anyhow::{Result, Error, bail, Context};
+use crate::cli_args::CliArgs;
 
 use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use crate::image_builder::merge_layer;
@@ -11,8 +13,35 @@ mod image_loader;
 mod initramfs_generator;
 mod errors;
 
+fn run(
+    args: CliArgs,
+    layers_subdir: PathBuf,
+    output_subdir: PathBuf,
+    overlay_subdir: PathBuf,
+) -> Result<()> {
+    let path = Path::new(output_subdir.as_path());
+
+    // image downloading and unpacking
+    let layers_paths = image_loader::download_image_fs(&args.image_name, layers_subdir)?;
+    debug!("Layers' paths: {:?}", layers_paths);
+
+    // reconstructing image with overlayfs
+    merge_layer(&layers_paths, path, &overlay_subdir)?;
+
+    // building initramfs
+    create_init_file(path, args.initfile_path)?;
+    insert_agent(path, args.agent_host_path)?;
+    generate_initramfs(path, Path::new(args.output_file.as_path()))?;
+
+    // cleanup of temporary directory
+    remove_dir_all(args.temp_directory.clone())
+        .with_context(|| "Failed to remove temporary directory".to_string())?;
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
-    let args = cli_args::CliArgs::get_args();
+    let args = CliArgs::get_args();
 
     tracing_subscriber::fmt()
         .with_max_level(if args.debug { Level::DEBUG } else { Level::INFO })
@@ -31,45 +60,16 @@ fn main() -> Result<()> {
         "arguments:",
     );
 
-    let layers_subdir = args.temp_directory.clone().join("layers/");
-    let output_subdir = args.temp_directory.clone().join("output/");
-    let overlay_subdir = args.temp_directory.clone().join("overlay/");
-
-    match image_loader::download_image_fs(&args.image_name, layers_subdir) {
-        Err(e) => {
-            error!(error = ?e, "image loader error");
-            bail!(e)
-        }
-        Ok(layers_paths) => {
-            debug!("Layers' paths: {:?}", layers_paths);
-
-            let path = Path::new(output_subdir.as_path());
-
-            merge_layer(&layers_paths, path, &overlay_subdir).expect("Merging layers failed");
-
-            if let Err(e) = create_init_file(path, args.initfile_path) {
-                error!(error = ?e, "while creating init file");
-                bail!(e)
-            }
-
-            if let Err(e) = insert_agent(path, args.agent_host_path) {
-                error!(error = ?e, "while inserting agent");
-                bail!(e)
-            }
-
-            if let Err(e) = generate_initramfs(path, Path::new(args.output_file.as_path())) {
-                error!(error = ?e, "while generating initramfs");
-                bail!(e)
-            }
-
-            // cleanup of temporary directory
-            if let Err(e) = remove_dir_all(args.temp_directory.clone())
-                .with_context(|| "Failed to remove temporary directory".to_string()) {
-                error!(?e, "");
-                bail!(e)
-            }
-
-            Ok(())
-        }
+    if let Err(e) = run(
+        args,
+        args.temp_directory.clone().join("layers/"),
+        args.temp_directory.clone().join("output/"),
+        args.temp_directory.clone().join("overlay/")
+    ) {
+        error!(error = ?e, "encountered error while running");
+        Err(e)
+    } else {
+        info!("Finished successfully!");
+        Ok(())
     }
 }
