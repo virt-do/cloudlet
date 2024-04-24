@@ -1,6 +1,6 @@
 use std::{fs::remove_dir_all, path::Path};
 use tracing::{debug, error, info, Level};
-use anyhow::{Result, Error, bail};
+use anyhow::{Result, Error, bail, Context};
 
 use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use crate::image_builder::merge_layer;
@@ -46,13 +46,28 @@ fn main() -> Result<()> {
             let path = Path::new(output_subdir.as_path());
 
             merge_layer(&layers_paths, path, &overlay_subdir).expect("Merging layers failed");
-            create_init_file(path, args.initfile_path)?;
-            insert_agent(path, args.agent_host_path)?;
 
-            generate_initramfs(path, Path::new(args.output_file.as_path()))?;
+            if let Err(e) = create_init_file(path, args.initfile_path) {
+                error!(error = ?e, "while creating init file");
+                bail!(e)
+            }
+
+            if let Err(e) = insert_agent(path, args.agent_host_path) {
+                error!(error = ?e, "while inserting agent");
+                bail!(e)
+            }
+
+            if let Err(e) = generate_initramfs(path, Path::new(args.output_file.as_path())) {
+                error!(error = ?e, "while generating initramfs");
+                bail!(e)
+            }
 
             // cleanup of temporary directory
-            remove_dir_all(args.temp_directory.clone()).expect("Could not remove temporary directory");
+            if let Err(e) = remove_dir_all(args.temp_directory.clone())
+                .with_context(|| "Failed to remove temporary directory".to_string()) {
+                error!(?e, "");
+                bail!(e)
+            }
 
             Ok(())
         }
