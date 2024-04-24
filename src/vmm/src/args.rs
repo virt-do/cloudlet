@@ -5,16 +5,31 @@ use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use tracing::level_filters;
 
-/// The Virtual Machine Manager for the Cloudlet serverless runtime.
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(version, about)]
+pub struct CliArgs {
+    #[command(subcommand)]
+    pub command: Commands,
+}
+
+#[derive(Parser, Debug)]
+pub enum Commands {
+    #[command(about = "Run a VMM instance.")]
+    Cli(CliArguments),
+    #[command(about = "Run a GRPC server listening for incoming requests.")]
+    Grpc,
+}
+
+/// Run a VMM instance.
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
 pub struct CliArguments {
     /// Path to the image of the Linux kernel to boot.
-    #[arg(short, long, env)]
+    #[arg(short, long, env, required = true)]
     pub kernel: PathBuf,
 
     /// Path to the cpio archive to use as the initramfs.
-    #[arg(short, long, env)]
+    #[arg(short, long, env, required = true)]
     pub initramfs: Option<PathBuf>,
 
     /// Number of virtual CPUs assigned to the guest.
@@ -26,11 +41,11 @@ pub struct CliArguments {
     pub memory: u32,
 
     /// IPv4 address of the host tap interface.
-    #[clap(long, env)]
+    #[clap(long, env, required = true)]
     pub network_host_ip: Ipv4Addr,
 
     /// Subnet mask of the host tap interface.
-    #[clap(long, env)]
+    #[clap(long, env, required = true)]
     pub network_host_netmask: Ipv4Addr,
 
     /// Verbosity level.
