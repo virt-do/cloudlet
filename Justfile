@@ -2,13 +2,9 @@ set shell := ["/bin/bash", "-uc"]
 
 setup:
   #!/bin/bash
-  pushd tools/rootfs
-  ./mkrootfs.sh
-  popd
-
-  pushd tools/kernel
-  ./mkkernel.sh
-  popd
+  set -e
+  just build-kernel
+  just build-rootfs
 
 run:
   #!/bin/bash
@@ -21,10 +17,29 @@ run:
 
 build-kernel:
   #!/bin/bash
-  pushd tools/kernel/linux-cloud-hypervisor && \
-    KCFLAGS="-Wa,-mx86-used-note=no" make bzImage -j `nproc`
+  pushd tools/kernel
+  ./mkkernel.sh
+  popd
 
-build-rootfs:
+build-agent args = "":
   #!/bin/bash
-  pushd tools/rootfs && \
-    ./mkrootfs.sh
+  docker run --rm \
+    -v cargo-cache:/root/.cargo \
+    -v $PWD:/volume \
+    -w /volume \
+    -t clux/muslrust \
+    cargo build --release --bin agent {{args}}
+
+build-rootfs mode = "dev":
+  #!/bin/bash
+  set -e
+  if [ "{{mode}}" = "dev" ]; then
+    echo "Building rootfs in debug mode"
+    just build-agent "--features debug-agent"
+  else
+    echo "Building rootfs in release mode"
+    just build-agent
+  fi
+  pushd tools/rootfs
+  ./mkrootfs.sh
+  popd
