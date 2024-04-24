@@ -44,11 +44,10 @@ fn main() {
             let path = Path::new(output_subdir.as_path());
 
             merge_layer(&layers_paths, path, &overlay_subdir).expect("Merging layers failed");
+            create_init_file(path, args.initfile_path)?;
+            insert_agent(path, args.agent_host_path)?;
 
-            create_init_file(path, args.initfile_path);
-            insert_agent(path, args.agent_host_path);
-
-            generate_initramfs(path, Path::new(args.output_file.as_path()));
+            generate_initramfs(path, Path::new(args.output_file.as_path()))?;
         }
     }
 
