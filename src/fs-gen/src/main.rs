@@ -1,15 +1,17 @@
 use std::{fs::remove_dir_all, path::Path};
 use tracing::{debug, error, info, Level};
+use anyhow::{Result, Error, bail};
 
 use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
-use image_builder::merge_layer;
+use crate::image_builder::merge_layer;
 
 mod cli_args;
 mod image_builder;
 mod image_loader;
 mod initramfs_generator;
+mod errors;
 
-fn main() {
+fn main() -> Result<()> {
     let args = cli_args::CliArgs::get_args();
 
     tracing_subscriber::fmt()
@@ -35,8 +37,8 @@ fn main() {
 
     match image_loader::download_image_fs(&args.image_name, layers_subdir) {
         Err(e) => {
-            error!(%e, "Received error while downloading image");
-            return;
+            error!(error = ?e, "image loader error");
+            bail!(e)
         }
         Ok(layers_paths) => {
             debug!("Layers' paths: {:?}", layers_paths);
@@ -48,9 +50,11 @@ fn main() {
             insert_agent(path, args.agent_host_path)?;
 
             generate_initramfs(path, Path::new(args.output_file.as_path()))?;
+
+            // cleanup of temporary directory
+            remove_dir_all(args.temp_directory.clone()).expect("Could not remove temporary directory");
+
+            Ok(())
         }
     }
-
-    // cleanup of temporary directory
-    remove_dir_all(args.temp_directory.clone()).expect("Could not remove temporary directory");
 }
