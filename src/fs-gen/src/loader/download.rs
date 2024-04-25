@@ -9,6 +9,7 @@ use crate::loader::utils::{get_docker_download_token, unpack_tarball};
 
 pub(crate) fn download_image_fs(
     image_name: &str,
+    architecture: &str,
     output_file: PathBuf,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
@@ -46,22 +47,19 @@ pub(crate) fn download_image_fs(
         None => Err(ImageLoaderError::ManifestNotFound(image_name.to_string(), tag.to_string()))?,
         Some(m) => m
     };
-    info!(architecture = "amd64", "Manifest list found. Looking for an architecture-specific manifest...");
+    info!(architecture, "Manifest list found. Looking for an architecture-specific manifest...");
 
-    // TODO: implement other than amd64?
-    let amd64_submanifest = manifest_list.iter().find(|manifest| {
+    let arch_specific_manifest = manifest_list.iter().find(|manifest| {
         manifest["platform"].as_object().unwrap()["architecture"]
             .as_str()
             .unwrap()
-            == "amd64"
+            == architecture
     });
 
-    let submanifest = match amd64_submanifest {
-        None => Err(ImageLoaderError::UnsupportedArchitecture("amd64".to_string()))?,
+    let submanifest = match arch_specific_manifest {
+        None => Err(ImageLoaderError::UnsupportedArchitecture(architecture.to_string()))?,
         Some(m) => {
             debug!("Downloading architecture-specific manifest");
-
-            
 
             download_manifest(
                 &client,

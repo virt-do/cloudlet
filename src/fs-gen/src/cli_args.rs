@@ -31,6 +31,9 @@ pub struct CliArgs {
     #[arg(short='i', long="init", default_value=None)]
     pub initfile_path: Option<PathBuf>,
 
+    #[arg(long="arch", default_value="amd64")]
+    pub architecture: String,
+
     #[arg(short='d', long="debug", action=ArgAction::SetTrue)]
     pub debug: bool,
 }
