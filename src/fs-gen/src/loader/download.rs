@@ -1,10 +1,9 @@
-use flate2::read::GzDecoder;
-use reqwest::blocking::{Client, Response};
-use std::fs::create_dir;
+use reqwest::blocking::Client;
+use std::fs::create_dir_all;
 use std::path::PathBuf;
-use tar::Archive;
 use tracing::{debug, info};
 use anyhow::{Context, Result};
+use serde_json::Value;
 use crate::loader::errors::ImageLoaderError;
 use crate::loader::utils::{get_docker_download_token, unpack_tarball};
 
@@ -12,84 +11,90 @@ pub(crate) fn download_image_fs(
     image_name: &str,
     output_file: PathBuf,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
+    info!("Downloading image...");
+
     // Get image's name and tag
     let image_and_tag: Vec<&str> = image_name.split(':').collect();
-
-    let tag = if image_and_tag.len() < 2 {
-        "latest"
-    } else {
-        image_and_tag[1]
-    };
     let image_name = image_and_tag[0];
+    let tag = if image_and_tag.len() < 2 { "latest" } else { image_and_tag[1] };
 
-    // Get download token
+    // Get download token and download manifest
     let client = Client::new();
     let token = &get_docker_download_token(&client, image_name)?;
-
-    // Download image manifest
-    let mut manifest_json = download_manifest(&client, token, image_name, tag)
+    let manifest = download_manifest(&client, token, image_name, tag)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
 
-    // Verify if it's a manifest or a manifest list
-    let mut layers = manifest_json["layers"].as_array();
 
-    if layers.is_none() {
-        let manifests = manifest_json["manifests"].as_array();
-        match manifests {
-            None => Err(ImageLoaderError::ManifestNotFound(image_name.to_string(), tag.to_string()))?,
-            Some(m) => {
-                debug!("Manifest list found. Looking for an amd64 manifest...");
-                // TODO: implement other than amd64?
-                // Get a manifest for amd64 architecture from the manifest list
-                let amd64_manifest = m.iter().find(|manifest| {
-                    manifest["platform"].as_object().unwrap()["architecture"]
-                        .as_str()
-                        .unwrap()
-                        == "amd64"
-                });
-
-                match amd64_manifest {
-                    None => Err(ImageLoaderError::UnsupportedArchitecture("amd64".to_string()))?,
-                    Some(m) => {
-                        info!("Downloading image...");
-                        debug!("Downloading manifest for amd64 architecture...");
-
-                        manifest_json = download_manifest(
-                            &client,
-                            token,
-                            image_name,
-                            m["digest"].as_str().unwrap()
-                        ).map_err(|e| ImageLoaderError::Error { source: e })?;
-
-                        layers = manifest_json["layers"].as_array();
-                        if layers.is_none() {
-                            Err(ImageLoaderError::LayersNotFound)?
-                        }
-                    }
-                }
-            }
-        }
+    if let Some(layers) = manifest["layers"].as_array() {
+        // We have layers already, no need to look into sub-manifests.
+        info!("Found layers in manifest");
+        create_dir_all(&output_file).with_context(|| "Could not create output directory for image downloading")?;
+        return download_layers(
+            layers,
+            &client,
+            token,
+            image_name,
+            &output_file
+        ).map_err(|e| ImageLoaderError::Error { source: e })
     }
 
-    let _ = create_dir(&output_file);
+    // Below, we assume there are no layers found.
+    // We dig into sub-manifests to try and find a suitable one to download, with hopefully layers inside.
 
-    download_layers(
-        layers.unwrap(),
-        &client,
-        token,
-        image_name,
-        &output_file
-    ).map_err(|e| ImageLoaderError::Error { source: e })
+    let manifest_list = match manifest["manifests"].as_array() {
+        // No sub-manifests found, we throw an error.
+        None => Err(ImageLoaderError::ManifestNotFound(image_name.to_string(), tag.to_string()))?,
+        Some(m) => m
+    };
+    info!(architecture = "amd64", "Manifest list found. Looking for an architecture-specific manifest...");
+
+    // TODO: implement other than amd64?
+    let amd64_submanifest = manifest_list.iter().find(|manifest| {
+        manifest["platform"].as_object().unwrap()["architecture"]
+            .as_str()
+            .unwrap()
+            == "amd64"
+    });
+
+    let submanifest = match amd64_submanifest {
+        None => Err(ImageLoaderError::UnsupportedArchitecture("amd64".to_string()))?,
+        Some(m) => {
+            debug!("Downloading architecture-specific manifest");
+
+            let submanifest = download_manifest(
+                &client,
+                token,
+                image_name,
+                m["digest"].as_str().unwrap()
+            ).map_err(|e| ImageLoaderError::Error { source: e })?;
+
+            submanifest
+        }
+    };
+    
+    match submanifest["layers"].as_array() {
+        None => Err(ImageLoaderError::LayersNotFound)?,
+        Some(layers) => {
+            create_dir_all(&output_file).with_context(|| "Could not create output directory for image downloading")?;
+            return download_layers(
+                layers,
+                &client,
+                token,
+                image_name,
+                &output_file
+            ).map_err(|e| ImageLoaderError::Error { source: e })
+        }
+    }
 }
 
-fn download_manifest(client: &Client, token: &str, image_name: &str, digest: &str) -> Result<serde_json::Value> {
+fn download_manifest(client: &Client, token: &str, image_name: &str, digest: &str) -> Result<Value> {
     // Query Docker Hub API to get the image manifest
     let manifest_url = format!(
         "https://registry-1.docker.io/v2/library/{}/manifests/{}",
         image_name, digest
     );
 
-    let manifest: serde_json::Value = client
+    let manifest: Value = client
         .get(manifest_url)
         .header(
             "Accept",
@@ -113,15 +118,15 @@ fn download_manifest(client: &Client, token: &str, image_name: &str, digest: &st
 }
 
 fn download_layers(
-    layers: &Vec<serde_json::Value>,
+    layers: &Vec<Value>,
     client: &Client,
     token: &str,
     image_name: &str,
     output_dir: &PathBuf,
 ) -> Result<Vec<PathBuf>> {
-    let mut layer_paths = Vec::new();
+    info!("Downloading and unpacking layers...");
 
-    debug!("Downloading and unpacking layers...");
+    let mut layer_paths = Vec::new();
 
     // Download and unpack each layer
     for layer in layers {
@@ -137,13 +142,9 @@ fn download_layers(
 
         debug!("starting to decode layer with digest '{}'", digest);
 
-        let tar = GzDecoder::new(response);
+        let output_path = output_dir.join(digest);
 
-        let mut output_path = PathBuf::new();
-        output_path.push(output_dir);
-        output_path.push(digest);
-
-        unpack_tarball(tar, &output_path)?;
+        unpack_tarball(response, &output_path)?;
         debug!("layer '{}' unpacked", digest);
         layer_paths.push(output_path);
     }
