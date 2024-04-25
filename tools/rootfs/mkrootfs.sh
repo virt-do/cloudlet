@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -e
+
 if [ ! -d alpine-minirootfs ]
 then
     curl -O https://dl-cdn.alpinelinux.org/alpine/v3.14/releases/x86_64/alpine-minirootfs-3.14.2-x86_64.tar.gz
@@ -8,7 +10,12 @@ then
     tar xf alpine-minirootfs-3.14.2-x86_64.tar.gz -C alpine-minirootfs
 fi
 
+
 pushd alpine-minirootfs
+mkdir -p etc/cloudlet/agent
+cp ../../../target/x86_64-unknown-linux-musl/release/agent agent
+cp ../config.toml etc/cloudlet/agent/config.toml
+
 cat > init <<EOF
 #! /bin/sh
 #
@@ -28,8 +35,9 @@ done
 
 ifconfig sl0 172.30.0.11 netmask 255.255.0.0 up
 
-exec /sbin/getty -n -l /bin/sh 115200 /dev/console
-poweroff -f
+/agent
+
+reboot
 EOF
 
 chmod +x init
