@@ -1,7 +1,7 @@
 use reqwest::blocking::Client;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use anyhow::{Context, Result};
 use serde_json::Value;
 use crate::loader::errors::ImageLoaderError;
@@ -29,6 +29,10 @@ pub(crate) fn download_image_fs(
     if let Some(layers) = manifest["layers"].as_array() {
         // We have layers already, no need to look into sub-manifests.
         info!("Found layers in manifest");
+        warn!(
+            architecture,
+            "Manifest did not specify architecture, the initramfs may not work for the requested architecture"
+        );
         create_dir_all(&output_file).with_context(|| "Could not create output directory for image downloading")?;
         return download_layers(
             layers,
