@@ -22,7 +22,7 @@ fn run(
     let path = Path::new(output_subdir.as_path());
 
     // image downloading and unpacking
-    let layers_paths = match download_image_fs(&args.image_name, layers_subdir) {
+    let layers_paths = match download_image_fs(&args.image_name, &args.architecture, layers_subdir) {
         Err(e) => bail!(e),
         Ok(e) => e
     };
@@ -59,6 +59,7 @@ fn main() -> Result<()> {
         output_file = ?args.output_file,
         temp_dir = ?args.temp_directory,
         initfile_path = ?args.initfile_path,
+        architecture = args.architecture,
         debug = args.debug,
         "arguments:",
     );
