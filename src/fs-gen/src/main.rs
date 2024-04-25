@@ -1,7 +1,7 @@
 use std::{fs::remove_dir_all, path::Path};
 use std::path::PathBuf;
 use tracing::{debug, error, info, Level};
-use anyhow::{Result, Error, bail, Context};
+use anyhow::{Result, bail, Context};
 use crate::cli_args::CliArgs;
 
 use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};

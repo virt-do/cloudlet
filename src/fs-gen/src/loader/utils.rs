@@ -5,8 +5,8 @@ use tar::Archive;
 use anyhow::{Context, Result};
 
 /// Unpack the tarball to a given directory.
-pub(super) fn unpack_tarball(tar: GzDecoder<Response>, output_dir: &PathBuf) -> Result<()> {
-    Archive::new(tar).unpack(output_dir.clone())
+pub(super) fn unpack_tarball(response: Response, output_dir: &PathBuf) -> Result<()> {
+    Archive::new(GzDecoder::new(response)).unpack(output_dir.clone())
         .with_context(|| format!("Failed to unpack tarball to {}", output_dir.display()))?;
     Ok(())
 }
