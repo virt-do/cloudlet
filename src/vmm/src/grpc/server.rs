@@ -5,6 +5,7 @@ use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::time::Duration;
 use std::{
     convert::From,
+    env::current_dir,
     net::Ipv4Addr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -50,9 +51,16 @@ impl VmmServiceTrait for VmmService {
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
         const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
+        // get current directory
+        let mut curr_dir = current_dir()?;
+
+        // define kernel path
+        let mut kernel_entire_path = curr_dir.as_os_str().to_owned();
+        kernel_entire_path.push("/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
+
         // Check if the kernel is on the system, else build it
-        if !Path::new("./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin")
-            .exists()
+        let kernel_exists = Path::new(&kernel_entire_path).try_exists().expect(&format!("Could not access folder {:?}", &kernel_entire_path));
+        if !kernel_exists
         {
             info!("Kernel not found, building kernel");
             // Execute the script using sh and capture output and error streams
@@ -64,19 +72,34 @@ impl VmmServiceTrait for VmmService {
                 .expect("Failed to execute the kernel build script");
 
             // Print output and error streams
-            error!("Script output: {}", String::from_utf8_lossy(&output.stdout));
+            info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
             error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
         };
+        let kernel_path = Path::new(&kernel_entire_path);
+        
+        // define initramfs file placement
+        let initramfs_entire_file_path = curr_dir.as_mut_os_string();
+        initramfs_entire_file_path.push("/tools/rootfs/initramfs.img");
+        
+        // Check if the initramfs is on the system, else build it
+        let initramfs_exists = Path::new(&initramfs_entire_file_path).try_exists().expect(&format!("Could not access folder {:?}", &initramfs_entire_file_path));
+        if !initramfs_exists
+        {
+            info!("Initramfs not found, building initramfs");
+            // Execute the script using sh and capture output and error streams
+            let output = Command::new("sh")
+                .arg("./tools/rootfs/mkrootfs.sh")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .expect("Failed to execute the initramfs build script");
 
-        let kernel_path = &Path::new(
-            "./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin",
-        );
-        let mut initramfs_path: PathBuf = PathBuf::new();
+            // Print output and error streams
+            info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
+            error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
+        };
+        let initramfs_path = PathBuf::from(&initramfs_entire_file_path);
 
-        // Todo - Check if the initramfs for the specified language is on the system, else build it
-        initramfs_path.push("./tools/rootfs/initramfs.img");
-
-        // // Create a new VMM
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
         // Configure the VMM parameters might need to be calculated rather than hardcoded
