@@ -10,7 +10,7 @@ run:
   #!/bin/bash
   CARGO_PATH=$(which cargo)
   sudo -E capsh --keep=1 --user=$USER --inh=cap_net_admin --addamb=cap_net_admin -- -c \
-    'RUST_BACKTRACE=1 '$CARGO_PATH' run --bin vmm -- --memory 512 --cpus 1 \
+    'RUST_BACKTRACE=1 '$CARGO_PATH' run --bin vmm -- cli --memory 512 --cpus 1 \
     --kernel tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin \
     --network-host-ip 172.29.0.1 --network-host-netmask 255.255.0.0 \
     --initramfs=tools/rootfs/initramfs.img'
@@ -43,3 +43,14 @@ build-rootfs mode = "dev":
   pushd tools/rootfs
   ./mkrootfs.sh
   popd
+
+configure-slip pts_num:
+  #!/bin/bash
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "Please run as root"
+    exit 1
+  fi
+  slattach -L /dev/pts/{{pts_num}} &
+  sleep 5
+  ip a add 172.30.0.10/16 dev sl0
+  ip l set sl0 up
