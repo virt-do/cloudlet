@@ -1,6 +1,6 @@
 use reqwest::blocking::Client;
 use std::fs::create_dir_all;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info};
 use anyhow::{Context, Result};
 use serde_json::Value;
@@ -61,14 +61,14 @@ pub(crate) fn download_image_fs(
         Some(m) => {
             debug!("Downloading architecture-specific manifest");
 
-            let submanifest = download_manifest(
+            
+
+            download_manifest(
                 &client,
                 token,
                 image_name,
                 m["digest"].as_str().unwrap()
-            ).map_err(|e| ImageLoaderError::Error { source: e })?;
-
-            submanifest
+            ).map_err(|e| ImageLoaderError::Error { source: e })?
         }
     };
     
@@ -76,7 +76,7 @@ pub(crate) fn download_image_fs(
         None => Err(ImageLoaderError::LayersNotFound)?,
         Some(layers) => {
             create_dir_all(&output_file).with_context(|| "Could not create output directory for image downloading")?;
-            return download_layers(
+            download_layers(
                 layers,
                 &client,
                 token,
@@ -122,7 +122,7 @@ fn download_layers(
     client: &Client,
     token: &str,
     image_name: &str,
-    output_dir: &PathBuf,
+    output_dir: &Path,
 ) -> Result<Vec<PathBuf>> {
     info!("Downloading and unpacking layers...");
 
