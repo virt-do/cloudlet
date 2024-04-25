@@ -5,9 +5,10 @@ use std::path::PathBuf;
 use tar::Archive;
 use tracing::{debug, info};
 use anyhow::{Context, Result};
-use crate::errors::ImageLoaderError;
+use crate::loader::errors::ImageLoaderError;
+use crate::loader::utils::{get_docker_download_token, unpack_tarball};
 
-pub fn download_image_fs(
+pub(crate) fn download_image_fs(
     image_name: &str,
     output_file: PathBuf,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
@@ -21,8 +22,12 @@ pub fn download_image_fs(
     };
     let image_name = image_and_tag[0];
 
+    // Get download token
+    let client = Client::new();
+    let token = &get_docker_download_token(&client, image_name)?;
+
     // Download image manifest
-    let mut manifest_json = download_manifest(image_name, tag)
+    let mut manifest_json = download_manifest(&client, token, image_name, tag)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
 
     // Verify if it's a manifest or a manifest list
@@ -48,9 +53,14 @@ pub fn download_image_fs(
                     Some(m) => {
                         info!("Downloading image...");
                         debug!("Downloading manifest for amd64 architecture...");
-                        manifest_json =
-                            download_manifest(image_name, m["digest"].as_str().unwrap())
-                                .map_err(|e| ImageLoaderError::Error { source: e })?;
+
+                        manifest_json = download_manifest(
+                            &client,
+                            token,
+                            image_name,
+                            m["digest"].as_str().unwrap()
+                        ).map_err(|e| ImageLoaderError::Error { source: e })?;
+
                         layers = manifest_json["layers"].as_array();
                         if layers.is_none() {
                             Err(ImageLoaderError::LayersNotFound)?
@@ -63,21 +73,16 @@ pub fn download_image_fs(
 
     let _ = create_dir(&output_file);
 
-    download_layers(layers.unwrap(), image_name, &output_file).map_err(|e| ImageLoaderError::Error { source: e })
+    download_layers(
+        layers.unwrap(),
+        &client,
+        token,
+        image_name,
+        &output_file
+    ).map_err(|e| ImageLoaderError::Error { source: e })
 }
 
-fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value> {
-    // Create a reqwest HTTP client
-    let client = Client::new();
-
-    // Get a token for anonymous authentication to Docker Hub
-    let token_json: serde_json::Value = client
-        .get(format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/{image_name}:pull"))
-        .send().with_context(|| "Could not send request for anonymous authentication".to_string())?
-        .json().with_context(|| "Failed to parse JSON response for anonymous authentication".to_string())?;
-
-    let token = token_json["token"].as_str().with_context(|| "Failed to get token from anon auth response".to_string())?;
-
+fn download_manifest(client: &Client, token: &str, image_name: &str, digest: &str) -> Result<serde_json::Value> {
     // Query Docker Hub API to get the image manifest
     let manifest_url = format!(
         "https://registry-1.docker.io/v2/library/{}/manifests/{}",
@@ -107,28 +112,13 @@ fn download_manifest(image_name: &str, digest: &str) -> Result<serde_json::Value
     Ok(manifest)
 }
 
-fn unpack_tarball(tar: GzDecoder<Response>, output_dir: &PathBuf) -> Result<()> {
-    Archive::new(tar).unpack(output_dir.clone())
-        .with_context(|| format!("Failed to unpack tarball to {}", output_dir.display()))?;
-    Ok(())
-}
-
 fn download_layers(
     layers: &Vec<serde_json::Value>,
+    client: &Client,
+    token: &str,
     image_name: &str,
     output_dir: &PathBuf,
 ) -> Result<Vec<PathBuf>> {
-    let client = Client::new();
-
-    // Get a token for anonymous authentication to Docker Hub
-    let token_json: serde_json::Value = client
-        .get(format!("https://auth.docker.io/token?service=registry.docker.io&scope=repository:library/{image_name}:pull"))
-        .send().with_context(|| "Could not send request for anon authentication (layers)".to_string())?
-        .json().with_context(|| "Failed to parse JSON response for anonymous authentication (layers)".to_string())?;
-
-    let token = token_json["token"].as_str()
-        .with_context(|| "Failed to get token from anon auth response (layers)".to_string())?;
-
     let mut layer_paths = Vec::new();
 
     debug!("Downloading and unpacking layers...");

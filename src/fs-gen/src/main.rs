@@ -6,12 +6,12 @@ use crate::cli_args::CliArgs;
 
 use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use crate::image_builder::merge_layer;
+use crate::loader::download::download_image_fs;
 
 mod cli_args;
 mod image_builder;
-mod image_loader;
 mod initramfs_generator;
-mod errors;
+mod loader;
 
 fn run(
     args: CliArgs,
@@ -22,7 +22,10 @@ fn run(
     let path = Path::new(output_subdir.as_path());
 
     // image downloading and unpacking
-    let layers_paths = image_loader::download_image_fs(&args.image_name, layers_subdir)?;
+    let layers_paths = match download_image_fs(&args.image_name, layers_subdir) {
+        Err(e) => bail!(e),
+        Ok(e) => e
+    };
     debug!("Layers' paths: {:?}", layers_paths);
 
     // reconstructing image with overlayfs
@@ -61,10 +64,10 @@ fn main() -> Result<()> {
     );
 
     if let Err(e) = run(
-        args,
-        args.temp_directory.clone().join("layers/"),
-        args.temp_directory.clone().join("output/"),
-        args.temp_directory.clone().join("overlay/")
+        args.clone(),
+        args.clone().temp_directory.clone().join("layers/"),
+        args.clone().temp_directory.clone().join("output/"),
+        args.clone().temp_directory.clone().join("overlay/")
     ) {
         error!(error = ?e, "encountered error while running");
         Err(e)
