@@ -11,7 +11,7 @@ static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// Convert an OCI image into a CPIO file
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(version, about, long_about = None)]
 pub struct CliArgs {
     /// The name of the image to download

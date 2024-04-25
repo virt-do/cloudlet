@@ -1,4 +1,4 @@
-
+use anyhow::Error;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -19,5 +19,11 @@ pub(crate) enum ImageLoaderError {
     #[error("Image loading error: {}", .source)]
     Error {
         source: anyhow::Error
+    }
+}
+
+impl From<anyhow::Error> for ImageLoaderError {
+    fn from(value: Error) -> Self {
+        Self::Error { source: value }
     }
 }
