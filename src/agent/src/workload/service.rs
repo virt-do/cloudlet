@@ -1,4 +1,4 @@
-use std::{process::exit, sync::Arc};
+use std::{process, sync::Arc};
 
 use crate::agent::{self, ExecuteRequest, ExecuteResponse, SignalRequest};
 
@@ -62,6 +62,6 @@ impl WorkloadRunner for WorkloadRunnerService {
     }
 
     async fn signal(&self, _: Request<SignalRequest>) -> Result<()> {
-        unreachable!();
+        process::exit(0)
     }
 }
