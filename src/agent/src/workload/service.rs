@@ -1,14 +1,10 @@
-use std::{process, sync::Arc};
-
+use super::runner::Runner;
 use crate::agent::{self, ExecuteRequest, ExecuteResponse, SignalRequest};
-
 use agent::workload_runner_server::WorkloadRunner;
-
+use std::{process, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
-
-use super::runner::Runner;
 
 type Result<T> = std::result::Result<Response<T>, tonic::Status>;
 
@@ -32,19 +28,14 @@ impl WorkloadRunner for WorkloadRunnerService {
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         // We assume there's only one request at a time
-        let runner = match self.runner.try_lock() {
-            Ok(runner) => runner,
-            Err(_) => {
-                return Err(tonic::Status::unavailable("Runner is busy"));
-            }
-        };
+        let runner = self
+            .runner
+            .try_lock()
+            .map_err(|e| tonic::Status::unavailable(format!("Runner is busy: {:?}", e)))?;
 
-        let res = match runner.run() {
-            Ok(res) => res,
-            Err(err) => {
-                return Err(tonic::Status::internal(err.to_string()));
-            }
-        };
+        let res = runner
+            .run()
+            .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         let _ = tx
             .send(Ok(ExecuteResponse {
@@ -62,6 +53,6 @@ impl WorkloadRunner for WorkloadRunnerService {
     }
 
     async fn signal(&self, _: Request<SignalRequest>) -> Result<()> {
-        process::exit(0)
+        process::exit(0);
     }
 }
