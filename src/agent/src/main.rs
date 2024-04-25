@@ -1,6 +1,10 @@
-use agent::workload::{config::Config, runner::Runner};
+use agent::{
+    agent::workload_runner_server::WorkloadRunnerServer,
+    workload::{config::Config, runner::Runner, service::WorkloadRunnerService},
+};
 use clap::Parser;
-use std::path::PathBuf;
+use std::{net::ToSocketAddrs, path::PathBuf};
+use tonic::transport::Server;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -8,11 +12,27 @@ struct Args {
     config: PathBuf,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let config = Config::from_file(&args.config).unwrap();
+
+    let bind_address = format!("{}:{}", config.server.address, config.server.port)
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
+
     let runner = Runner::new(config);
 
-    runner.run().unwrap();
+    let server = WorkloadRunnerService::new(runner);
+
+    Server::builder()
+        .add_service(WorkloadRunnerServer::new(server))
+        .serve(bind_address)
+        .await
+        .unwrap();
+
+    Ok(())
 }

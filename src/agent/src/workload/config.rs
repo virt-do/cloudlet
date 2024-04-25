@@ -2,6 +2,13 @@ use crate::{agents::Language, AgentError, AgentResult};
 use serde::Deserialize;
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Server {
+    pub address: String,
+    pub port: u16,
+}
+
 /// Generic agent configuration.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -12,6 +19,8 @@ pub struct Config {
     pub language: Language,
     /// Action to perform.
     pub action: Action,
+    /// Server configuration.
+    pub server: Server,
     /// Rest of the configuration as a string.
     #[serde(skip)]
     pub config_string: String,
