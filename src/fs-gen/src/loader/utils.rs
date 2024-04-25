@@ -1,12 +1,12 @@
 use flate2::read::GzDecoder;
 use reqwest::blocking::{Client, Response};
-use std::path::PathBuf;
+use std::path::{Path};
 use tar::Archive;
 use anyhow::{Context, Result};
 
 /// Unpack the tarball to a given directory.
-pub(super) fn unpack_tarball(response: Response, output_dir: &PathBuf) -> Result<()> {
-    Archive::new(GzDecoder::new(response)).unpack(output_dir.clone())
+pub(super) fn unpack_tarball(response: Response, output_dir: &Path) -> Result<()> {
+    Archive::new(GzDecoder::new(response)).unpack(output_dir)
         .with_context(|| format!("Failed to unpack tarball to {}", output_dir.display()))?;
     Ok(())
 }
