@@ -1,5 +1,4 @@
 use std::{fs::remove_dir_all, path::Path};
-use std::path::PathBuf;
 use tracing::{debug, error, info, Level};
 use anyhow::{Result, bail, Context};
 use crate::cli_args::CliArgs;
@@ -15,10 +14,11 @@ mod loader;
 
 fn run(
     args: CliArgs,
-    layers_subdir: PathBuf,
-    output_subdir: PathBuf,
-    overlay_subdir: PathBuf,
 ) -> Result<()> {
+    let layers_subdir = args.temp_directory.join("layers/");
+    let output_subdir = args.temp_directory.join("output/");
+    let overlay_subdir = args.temp_directory.join("overlay/");
+
     let path = Path::new(output_subdir.as_path());
 
     // image downloading and unpacking
@@ -64,12 +64,7 @@ fn main() -> Result<()> {
         "arguments:",
     );
 
-    if let Err(e) = run(
-        args.clone(),
-        args.clone().temp_directory.clone().join("layers/"),
-        args.clone().temp_directory.clone().join("output/"),
-        args.clone().temp_directory.clone().join("overlay/")
-    ) {
+    if let Err(e) = run(args) {
         error!(error = ?e, "encountered error while running");
         Err(e)
     } else {
