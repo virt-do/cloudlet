@@ -1,5 +1,7 @@
-use self::vmmorchestrator::{vmm_service_server::VmmService as VmmServiceTrait, RunVmmRequest};
 use crate::grpc::client::agent::ExecuteRequest;
+use self::vmmorchestrator::{
+    vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest
+};
 use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::time::Duration;
@@ -85,10 +87,21 @@ impl VmmServiceTrait for VmmService {
         let initramfs_exists = Path::new(&initramfs_entire_file_path).try_exists().expect(&format!("Could not access folder {:?}", &initramfs_entire_file_path));
         if !initramfs_exists
         {
+            // get request with the language
+            let req: RunVmmRequest = request.into_inner();
+            let language: Language = Language::from_i32(req.language).expect("Unknown language");
+
+            let image = match language {
+                Language::Rust    => "rust:alpine",
+                Language::Python  => "python:alpine",
+                Language::Node    => "node:alpine",
+            };
+
             info!("Initramfs not found, building initramfs");
             // Execute the script using sh and capture output and error streams
             let output = Command::new("sh")
                 .arg("./tools/rootfs/mkrootfs.sh")
+                .arg(image)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .output()

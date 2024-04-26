@@ -8,7 +8,7 @@ fi
 
 if [ -d fs-gen ]
 then
-    cargo run --bin fs-gen -- alpine:latest ./fs-gen/test -o ../tools/rootfs/initramfs.img
+    cargo run --bin fs-gen -- $1 ./fs-gen/test -o ../tools/rootfs/initramfs.img
 else
     echo "Module fs-gen not found"
 fi
