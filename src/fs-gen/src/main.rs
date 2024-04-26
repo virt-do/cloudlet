@@ -1,12 +1,12 @@
+use anyhow::{bail, Context, Result};
 use std::{fs::remove_dir_all, path::Path};
-use tracing::{debug, error, info};
-use anyhow::{Result, bail, Context};
 use tracing::level_filters::LevelFilter;
+use tracing::{debug, error, info};
 use tracing_subscriber::filter::EnvFilter;
 
 use crate::cli_args::CliArgs;
-use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use crate::image_builder::merge_layer;
+use crate::initramfs_generator::{create_init_file, generate_initramfs, insert_agent};
 use crate::loader::download::download_image_fs;
 
 mod cli_args;
@@ -14,18 +14,17 @@ mod image_builder;
 mod initramfs_generator;
 mod loader;
 
-fn run(
-    args: CliArgs,
-) -> Result<()> {
+fn run(args: CliArgs) -> Result<()> {
     let layers_subdir = args.temp_directory.join("layers/");
     let overlay_subdir = args.temp_directory.join("overlay/");
     let _binding = args.temp_directory.join("output/");
     let output_subdir = _binding.as_path();
 
     // image downloading and unpacking
-    let layers_paths = match download_image_fs(&args.image_name, &args.architecture, layers_subdir) {
+    let layers_paths = match download_image_fs(&args.image_name, &args.architecture, layers_subdir)
+    {
         Err(e) => bail!(e),
-        Ok(e) => e
+        Ok(e) => e,
     };
     debug!("Layers' paths: {:?}", layers_paths);
 
@@ -51,18 +50,27 @@ fn main() -> Result<()> {
         .with_env_filter(
             EnvFilter::builder()
                 .with_default_directive(
-                    (if args.debug { LevelFilter::DEBUG } else { LevelFilter::INFO }).into()
+                    (if args.debug {
+                        LevelFilter::DEBUG
+                    } else {
+                        LevelFilter::INFO
+                    })
+                    .into(),
                 )
                 .from_env()?
-                .add_directive("fuse_backend_rs=warn".parse()?)
+                .add_directive("fuse_backend_rs=warn".parse()?),
         )
         .init();
-    
+
     // tracing_subscriber::fmt()
     //     .with_max_level(if args.debug { Level::DEBUG } else { Level::INFO })
     //     .init();
 
-    info!("Cloudlet initramfs generator: '{}' v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    info!(
+        "Cloudlet initramfs generator: '{}' v{}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    );
     info!("Generating for image '{}'", args.image_name);
 
     debug!(

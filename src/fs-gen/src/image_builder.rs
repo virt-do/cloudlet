@@ -136,7 +136,7 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
         .with_context(|| "Failed to unmount the fuse session".to_string())?;
 
     let _ = handle.join();
-    
+
     info!("Finished merging layers!");
     Ok(())
 }

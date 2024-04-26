@@ -1,10 +1,10 @@
-use std::fs::{File, Permissions, copy as fscopy};
-use std::io::{Write, copy as iocopy};
+use anyhow::{Context, Result};
+use std::fs::{copy as fscopy, File, Permissions};
+use std::io::{copy as iocopy, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use tracing::info;
-use anyhow::{Context, Result};
 
 const INIT_FILE: &str = include_str!("../resources/initfile");
 
@@ -39,8 +39,8 @@ pub fn insert_agent(destination: &Path, agent_path: PathBuf) -> Result<()> {
     file.set_permissions(Permissions::from_mode(0o755))
         .with_context(|| "Failed to set permissions for agent file".to_string())?;
 
-    let mut agent = File::open(agent_path)
-        .with_context(|| "Could not open host agent file".to_string())?;
+    let mut agent =
+        File::open(agent_path).with_context(|| "Could not open host agent file".to_string())?;
     iocopy(&mut agent, &mut file)
         .with_context(|| "Failed to copy agent contents from host to destination".to_string())?;
 
@@ -65,9 +65,9 @@ pub fn generate_initramfs(root_directory: &Path, output: &Path) -> Result<()> {
         .spawn()
         .with_context(|| "Failed to package initramfs into bundle".to_string())?;
 
-    command
-        .wait()
-        .with_context(|| "Encountered exception while waiting for bundling to finish".to_string())?;
+    command.wait().with_context(|| {
+        "Encountered exception while waiting for bundling to finish".to_string()
+    })?;
 
     info!("Initramfs generated!");
 
