@@ -13,7 +13,7 @@ use fuse_backend_rs::{
     passthrough::{self, PassthroughFs},
     transport::{FuseChannel, FuseSession},
 };
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 static FILE_EXISTS_ERROR: i32 = 17;
 
@@ -72,6 +72,8 @@ fn ensure_folder_created(output_folder: &Path) -> Result<()> {
 /// merge_layer(vec!["source/layer_1", "source/layer_2"], "/tmp/fused_layers", "/tmp")
 /// ```
 pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Path) -> Result<()> {
+    info!("Starting to merge layers...");
+
     // Stack all lower layers
     let mut lower_layers = Vec::new();
     for lower in blob_paths {
@@ -134,6 +136,8 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
         .with_context(|| "Failed to unmount the fuse session".to_string())?;
 
     let _ = handle.join();
+    
+    info!("Finished merging layers!");
     Ok(())
 }
 
