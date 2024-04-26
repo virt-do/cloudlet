@@ -17,9 +17,7 @@ pub(crate) enum ImageLoaderError {
 
     /// Encountered an error during the flow.
     #[error("Image loading error: {}", .source)]
-    Error {
-        source: anyhow::Error
-    }
+    Error { source: anyhow::Error },
 }
 
 impl From<anyhow::Error> for ImageLoaderError {

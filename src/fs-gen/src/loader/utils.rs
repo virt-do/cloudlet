@@ -1,12 +1,13 @@
+use anyhow::{Context, Result};
 use flate2::read::GzDecoder;
 use reqwest::blocking::{Client, Response};
-use std::path::{Path};
+use std::path::Path;
 use tar::Archive;
-use anyhow::{Context, Result};
 
 /// Unpack the tarball to a given directory.
 pub(super) fn unpack_tarball(response: Response, output_dir: &Path) -> Result<()> {
-    Archive::new(GzDecoder::new(response)).unpack(output_dir)
+    Archive::new(GzDecoder::new(response))
+        .unpack(output_dir)
         .with_context(|| format!("Failed to unpack tarball to {}", output_dir.display()))?;
     Ok(())
 }
@@ -18,8 +19,11 @@ pub(super) fn get_docker_download_token(client: &Client, image_name: &str) -> Re
         .send().with_context(|| "Could not send request for anonymous authentication".to_string())?
         .json().with_context(|| "Failed to parse JSON response for anonymous authentication".to_string())?;
 
-    match token_json["token"].as_str().with_context(|| "Failed to get token from anon auth response".to_string()) {
+    match token_json["token"]
+        .as_str()
+        .with_context(|| "Failed to get token from anon auth response".to_string())
+    {
         Ok(t) => Ok(t.to_owned()),
-        Err(e) => Err(e)
+        Err(e) => Err(e),
     }
 }
