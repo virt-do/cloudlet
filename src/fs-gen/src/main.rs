@@ -62,10 +62,6 @@ fn main() -> Result<()> {
         )
         .init();
 
-    // tracing_subscriber::fmt()
-    //     .with_max_level(if args.debug { Level::DEBUG } else { Level::INFO })
-    //     .init();
-
     info!(
         "Cloudlet initramfs generator: '{}' v{}",
         env!("CARGO_PKG_NAME"),
