@@ -1,11 +1,13 @@
 use crate::loader::errors::ImageLoaderError;
-use crate::loader::utils::{get_docker_download_token, unpack_tarball};
+use crate::loader::structs::{Layer, ManifestV2};
+use crate::loader::utils::{get_docker_download_token, split_image_name, unpack_tarball};
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
-use serde_json::Value;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
+
+use super::structs::Image;
 
 pub(crate) fn download_image_fs(
     image_name: &str,
@@ -14,56 +16,44 @@ pub(crate) fn download_image_fs(
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
 
-    // Get image's name and tag
-    let image_and_tag: Vec<&str> = image_name.split(':').collect();
-    let image_name = image_and_tag[0];
-    let tag = if image_and_tag.len() < 2 {
-        "latest"
-    } else {
-        image_and_tag[1]
-    };
+    let image = split_image_name(image_name);
 
     // Get download token and download manifest
     let client = Client::new();
-    let token = &get_docker_download_token(&client, image_name)?;
-    let manifest = download_manifest(&client, token, image_name, tag)
+    let token = &get_docker_download_token(&client, &image)?;
+    let manifest = download_manifest(&client, token, &image, &image.tag)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
 
-    if let Some(layers) = manifest["layers"].as_array() {
-        // We have layers already, no need to look into sub-manifests.
+    if let ManifestV2::ImageManifest(m) = manifest {
+        // We directly get the image manifest rather than a list of manifests (fat manifest)
         info!("Found layers in manifest");
         warn!(
-            architecture,
-            "Manifest did not specify architecture, the initramfs may not work for the requested architecture"
+            "{}:{} is not a multi-platform image, the initramfs is not guaranteed to work correctly on the architecture {}",
+            image.name, image.tag, architecture
         );
         create_dir_all(&output_file)
             .with_context(|| "Could not create output directory for image downloading")?;
-        return download_layers(layers, &client, token, image_name, &output_file)
+        return download_layers(&m.layers, &client, token, &image, &output_file)
             .map_err(|e| ImageLoaderError::Error { source: e });
     }
 
-    // Below, we assume there are no layers found.
+    // Below, we assume that the image is multi-platform and we received a list of manifests (fat manifest).
     // We dig into sub-manifests to try and find a suitable one to download, with hopefully layers inside.
 
-    let manifest_list = match manifest["manifests"].as_array() {
-        // No sub-manifests found, we throw an error.
-        None => Err(ImageLoaderError::ManifestNotFound(
-            image_name.to_string(),
-            tag.to_string(),
-        ))?,
-        Some(m) => m,
+    let manifest_list = match manifest {
+        // The manifest structure doesn't correspond to a fat manifest, we throw an error.
+        ManifestV2::ManifestList(m) => m,
+        _ => Err(ImageLoaderError::ManifestNotFound(image.clone()))?,
     };
     info!(
         architecture,
         "Manifest list found. Looking for an architecture-specific manifest..."
     );
 
-    let arch_specific_manifest = manifest_list.iter().find(|manifest| {
-        manifest["platform"].as_object().unwrap()["architecture"]
-            .as_str()
-            .unwrap()
-            == architecture
-    });
+    let arch_specific_manifest = manifest_list
+        .manifests
+        .iter()
+        .find(|manifest| manifest.platform.architecture == architecture);
 
     let submanifest = match arch_specific_manifest {
         None => Err(ImageLoaderError::UnsupportedArchitecture(
@@ -72,35 +62,36 @@ pub(crate) fn download_image_fs(
         Some(m) => {
             debug!("Downloading architecture-specific manifest");
 
-            download_manifest(&client, token, image_name, m["digest"].as_str().unwrap())
+            download_manifest(&client, token, &image, &m.digest)
                 .map_err(|e| ImageLoaderError::Error { source: e })?
         }
     };
 
-    match submanifest["layers"].as_array() {
-        None => Err(ImageLoaderError::LayersNotFound)?,
-        Some(layers) => {
+    match submanifest {
+        // The submanifest structure doesn't correspond to an image manifest, we throw an error.
+        ManifestV2::ImageManifest(m) => {
             create_dir_all(&output_file)
                 .with_context(|| "Could not create output directory for image downloading")?;
-            download_layers(layers, &client, token, image_name, &output_file)
+            download_layers(&m.layers, &client, token, &image, &output_file)
                 .map_err(|e| ImageLoaderError::Error { source: e })
         }
+        _ => Err(ImageLoaderError::ImageManifestNotFound(image.clone()))?,
     }
 }
 
 fn download_manifest(
     client: &Client,
     token: &str,
-    image_name: &str,
+    image: &Image,
     digest: &str,
-) -> Result<Value> {
+) -> Result<ManifestV2> {
     // Query Docker Hub API to get the image manifest
     let manifest_url = format!(
-        "https://registry-1.docker.io/v2/library/{}/manifests/{}",
-        image_name, digest
+        "https://registry-1.docker.io/v2/{}/{}/manifests/{}",
+        image.repository, image.name, digest
     );
 
-    let manifest: Value = client
+    let manifest: ManifestV2 = client
         .get(manifest_url)
         .header(
             "Accept",
@@ -126,10 +117,10 @@ fn download_manifest(
 }
 
 fn download_layers(
-    layers: &Vec<Value>,
+    layers: &Vec<Layer>,
     client: &Client,
     token: &str,
-    image_name: &str,
+    image: &Image,
     output_dir: &Path,
 ) -> Result<Vec<PathBuf>> {
     info!("Downloading and unpacking layers...");
@@ -138,12 +129,10 @@ fn download_layers(
 
     // Download and unpack each layer
     for layer in layers {
-        let digest = layer["digest"]
-            .as_str()
-            .with_context(|| "Failed to get digest for layer".to_string())?;
+        let digest = &layer.digest;
         let layer_url = format!(
-            "https://registry-1.docker.io/v2/library/{}/blobs/{}",
-            image_name, digest
+            "https://registry-1.docker.io/v2/{}/{}/blobs/{}",
+            image.repository, image.name, digest
         );
 
         let response = client

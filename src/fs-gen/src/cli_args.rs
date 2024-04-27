@@ -14,7 +14,7 @@ static RE_IMAGE_NAME: Lazy<Regex> = Lazy::new(|| {
 #[derive(Parser, Debug, Clone)]
 #[command(version, about, long_about = None)]
 pub struct CliArgs {
-    /// The name of the image to download
+    /// The name of the image to download, can include repository and tag: [REPOSITORY/NAME:TAG]
     pub image_name: String,
 
     /// The host path to the guest agent binary
