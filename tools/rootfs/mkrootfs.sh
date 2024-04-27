@@ -6,6 +6,9 @@ then
     cd src
 fi
 
+# augment the open file limit
+ulimit -Sn 8192
+
 if [ -d fs-gen ]
 then
     cargo run --bin fs-gen -- $1 ./fs-gen/test -o ../tools/rootfs/initramfs.img

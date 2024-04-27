@@ -1,7 +1,8 @@
 use crate::args::{CliArgs, Commands};
 use clap::Parser;
 use tonic::transport::Server;
-use tracing::info;
+use tracing::{info, level_filters::LevelFilter};
+use tracing_subscriber::EnvFilter;
 use vmm::{
     core::vmm::VMM,
     grpc::server::{vmmorchestrator, VmmService},
@@ -13,6 +14,17 @@ mod args;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the configuration and configure logger verbosity
     let args = CliArgs::parse();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::builder()
+                .with_default_directive(
+                    LevelFilter::INFO
+                    .into(),
+                )
+                .from_env()?
+        )
+        .init();
 
     info!(
         app_name = env!("CARGO_PKG_NAME"),
