@@ -5,6 +5,7 @@ use crate::core::devices::serial::LumperSerial;
 use crate::core::epoll_context::{EpollContext, EPOLL_EVENTS_LEN};
 use crate::core::kernel;
 use crate::core::{Error, Result};
+use event_manager::{EventManager, MutEventSubscriber};
 use kvm_bindings::{kvm_userspace_memory_region, KVM_MAX_CPUID_ENTRIES};
 use kvm_ioctls::{Kvm, VmFd};
 use linux_loader::loader::KernelLoaderResult;
@@ -17,13 +18,16 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tracing::info;
 use vm_allocator::{AddressAllocator, AllocPolicy};
-// use vm_device::bus::{MmioAddress, MmioRange};
-use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
+use vm_device::bus::{MmioAddress, MmioRange};
+use vm_memory::{
+    Address, GuestAddress, GuestAddressSpace, GuestMemory, GuestMemoryMmap, GuestMemoryRegion,
+};
 use vmm_sys_util::terminal::Terminal;
 
-// use super::devices::virtio::net::device::Net;
+use super::devices::virtio::net::device::Net;
 use super::devices::virtio::net::tuntap::open_tap::open_tap;
 use super::devices::virtio::net::tuntap::tap::Tap;
+use super::devices::virtio::MmioConfig;
 use super::irq_allocator::IrqAllocator;
 use super::slip_pty::SlipPty;
 
@@ -51,6 +55,7 @@ pub struct VMM {
     guest_memory: GuestMemoryMmap,
     address_allocator: Option<AddressAllocator>,
     irq_allocator: IrqAllocator,
+    event_mgr: EventManager<Arc<Mutex<dyn MutEventSubscriber + Send>>>,
     vcpus: Vec<Vcpu>,
     _tap: Tap,
 
@@ -104,6 +109,7 @@ impl VMM {
             guest_memory: GuestMemoryMmap::default(),
             address_allocator: None,
             irq_allocator,
+            event_mgr: EventManager::new().unwrap(),
             vcpus: vec![],
             _tap: tap,
             serial: Arc::new(Mutex::new(
@@ -338,23 +344,37 @@ impl VMM {
         Ok(())
     }
 
-    // pub fn configure_net_device(&mut self) -> Result<String> {
-    //     let mem = Arc::new(self.guest_memory.clone());
-    //     let range = if let Some(allocator) = &self.address_allocator {
-    //         allocator
-    //             .to_owned()
-    //             .allocate(0x1000, DEFAULT_ADDRESS_ALIGNEMNT, DEFAULT_ALLOC_POLICY)
-    //             .unwrap()
-    //     } else {
-    //         // Handle the case where self.address_allocator is None
-    //         panic!("Address allocator is not initialized");
-    //     };
-    //     let _mmio_range = MmioRange::new(MmioAddress(range.start()), range.len()).unwrap();
-    //     let irq = self.irq_allocator.next_irq().unwrap();
+    pub fn configure_net_device(&mut self, tap_name: String) -> Result<String> {
+        let mem = Arc::new(self.guest_memory.clone());
+        let range = if let Some(allocator) = &self.address_allocator {
+            allocator
+                .to_owned()
+                .allocate(0x1000, DEFAULT_ADDRESS_ALIGNEMNT, DEFAULT_ALLOC_POLICY)
+                .unwrap()
+        } else {
+            // Handle the case where self.address_allocator is None
+            panic!("Address allocator is not initialized");
+        };
+        let mmio_range = MmioRange::new(MmioAddress(range.start()), range.len()).unwrap();
+        let irq = self.irq_allocator.next_irq().unwrap();
+        let mmio_cfg = MmioConfig {
+            range: mmio_range,
+            gsi: irq,
+        };
 
-    //     // !TODO: MMIO Device Discovery + MMIO Device Register Layout
-    //     let net = Net::new(range.len(), GuestAddress(range.start()), irq, mem).unwrap();
+        // let mut guard = self.device_mgr.lock().unwrap();
 
-    //     Ok(net.get_vmmio_parameter())
-    // }
+        // !TODO: MMIO Device Discovery + MMIO Device Register Layout
+        let net = Net::new(
+            mem.memory(),
+            mmio_cfg,
+            tap_name,
+            irq,
+            self.event_mgr.remote_endpoint(),
+            &self.vm_fd,
+        )
+        .unwrap();
+
+        Ok("net.get_vmmio_parameter()".to_string())
+    }
 }

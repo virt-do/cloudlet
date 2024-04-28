@@ -19,7 +19,7 @@ const TX_IOEVENT_DATA: u32 = 2;
 
 pub struct QueueHandler<M, S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
     <M as Deref>::Target: GuestMemory,
 {
@@ -30,7 +30,7 @@ where
 
 impl<M, S> QueueHandler<M, S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
     <M as Deref>::Target: GuestMemory,
 {
@@ -49,7 +49,7 @@ where
 
 impl<M, S> MutEventSubscriber for QueueHandler<M, S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
     <M as Deref>::Target: GuestMemory,
 {

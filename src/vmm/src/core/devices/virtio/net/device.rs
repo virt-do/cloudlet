@@ -1,7 +1,9 @@
+use super::queue_handler::QueueHandler;
 use super::Result;
 use super::{
     simple_handler::SimpleHandler, tuntap::tap::Tap, Error, NET_DEVICE_ID, VIRTIO_NET_HDR_SIZE,
 };
+use crate::core::devices::virtio::register::register_mmio_device;
 use crate::core::devices::virtio::{
     Config, MmioConfig, SingleFdSignalQueue, Subscriber, QUEUE_MAX_SIZE,
 };
@@ -23,34 +25,31 @@ use virtio_bindings::{
 use virtio_device::{VirtioConfig, VirtioDeviceActions, VirtioDeviceType, VirtioMmioDevice};
 use virtio_queue::{Queue, QueueT};
 use vm_device::{bus::MmioAddress, MutDeviceMmio};
-use vm_memory::{GuestAddress, GuestAddressSpace, GuestMemory, GuestUsize};
+use vm_memory::{GuestAddressSpace, GuestMemory};
 
-pub struct Net<M>
+pub struct Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     <M as Deref>::Target: GuestMemory,
 {
-    config: Config,
+    mem: Arc<M>,
+    config: Config<'a>,
     tap_name: String,
     vmmio_parameter: String,
-    mem: Arc<M>,
 }
 
-impl<M> Net<M>
+impl<'a, M> Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
     pub fn new(
-        tap_name: String,
-        size: GuestUsize,
-        baseaddr: GuestAddress,
-        irq: u32,
-        virtio_cfg: VirtioConfig<Queue>,
-        mmio: MmioConfig,
-        endpoint: RemoteEndpoint<Subscriber>,
-        vm_fd: Arc<VmFd>,
         mem: Arc<M>,
+        mmio_cfg: MmioConfig,
+        tap_name: String,
+        irq: u32,
+        endpoint: RemoteEndpoint<Subscriber>,
+        vm_fd: &VmFd,
     ) -> Result<Arc<Mutex<Self>>> {
         let device_features = (1 << VIRTIO_F_VERSION_1)
             // | (1 << VIRTIO_F_RING_EVENT_IDX)
@@ -72,15 +71,16 @@ where
         let virtio_cfg = VirtioConfig::new(device_features, queues, config_space);
 
         // let vmmio_parameter = register_mmio_device(size, baseaddr, irq, None).unwrap();
-        let device_cfg = Config::new(virtio_cfg, mmio, endpoint, vm_fd).unwrap();
+        let cfg = Config::new(virtio_cfg, mmio_cfg, endpoint, vm_fd).unwrap();
 
         let net = Arc::new(Mutex::new(Net {
-            config: device_cfg,
+            mem,
+            config: cfg,
             tap_name,
             vmmio_parameter: "".to_string(),
-            mem,
         }));
 
+        register_mmio_device(mmio_cfg, irq, None);
         // env.register_mmio_device(net.clone())
         // .map_err(Error::Virtio)?;
 
@@ -92,9 +92,9 @@ where
     }
 }
 
-impl<M> VirtioDeviceType for Net<M>
+impl<'a, M> VirtioDeviceType for Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
     fn device_type(&self) -> u32 {
@@ -102,9 +102,9 @@ where
     }
 }
 
-impl<M> Borrow<VirtioConfig<Queue>> for Net<M>
+impl<'a, M> Borrow<VirtioConfig<Queue>> for Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
     fn borrow(&self) -> &VirtioConfig<Queue> {
@@ -112,9 +112,9 @@ where
     }
 }
 
-impl<M> BorrowMut<VirtioConfig<Queue>> for Net<M>
+impl<'a, M> BorrowMut<VirtioConfig<Queue>> for Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
     fn borrow_mut(&mut self) -> &mut VirtioConfig<Queue> {
@@ -122,9 +122,9 @@ where
     }
 }
 
-impl<M> VirtioDeviceActions for Net<M>
+impl<'a, M> VirtioDeviceActions for Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
     type E = Error;
@@ -147,19 +147,17 @@ where
 
         let rxq = self.config.virtio.queues.remove(0);
         let txq = self.config.virtio.queues.remove(0);
-        let inner = SimpleHandler::new(driver_notify, rxq, txq, tap, self.mem.to_owned());
+        let inner = SimpleHandler::new(driver_notify, rxq, txq, tap, self.mem.clone());
 
-        // let handler = Arc::new(Mutex::new(QueueHandler {
-        //     inner,
-        //     rx_ioevent: ioevents.remove(0),
-        //     tx_ioevent: ioevents.remove(0),
-        // }));
+        let handler = Arc::new(Mutex::new(QueueHandler {
+            inner,
+            rx_ioevent: ioevents.remove(0),
+            tx_ioevent: ioevents.remove(0),
+        }));
 
-        // self.config
-        //     .finalize_activate(handler)
-        //     .map_err(Error::Virtio)
-
-        Ok(())
+        self.config
+            .finalize_activate(handler)
+            .map_err(Error::Virtio)
     }
 
     fn reset(&mut self) -> std::result::Result<(), Error> {
@@ -168,16 +166,16 @@ where
     }
 }
 
-impl<M> VirtioMmioDevice for Net<M>
+impl<'a, M> VirtioMmioDevice for Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
 }
 
-impl<M> MutDeviceMmio for Net<M>
+impl<'a, M> MutDeviceMmio for Net<'a, M>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Send + 'static + Sync,
     <M as Deref>::Target: GuestMemory,
 {
     fn mmio_read(&mut self, _base: MmioAddress, offset: u64, data: &mut [u8]) {

@@ -47,7 +47,7 @@ impl From<virtio_queue::Error> for Error {
 // TODO: Find a better name.
 pub struct SimpleHandler<M, S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
     <M as Deref>::Target: GuestMemory,
 {
@@ -63,7 +63,7 @@ where
 
 impl<M, S> SimpleHandler<M, S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
     <M as Deref>::Target: GuestMemory,
 {

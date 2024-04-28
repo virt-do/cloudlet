@@ -80,20 +80,20 @@ impl MmioConfig {
     }
 }
 
-struct Config {
+struct Config<'a> {
     virtio: VirtioConfig<Queue>,
     mmio: MmioConfig,
     endpoint: RemoteEndpoint<Subscriber>,
-    vm_fd: Arc<VmFd>,
+    vm_fd: &'a VmFd,
     irqfd: Arc<EventFd>,
 }
 
-impl Config {
+impl<'a> Config<'a> {
     pub fn new(
         virtio_cfg: VirtioConfig<Queue>,
         mmio: MmioConfig,
         endpoint: RemoteEndpoint<Subscriber>,
-        vm_fd: Arc<VmFd>,
+        vm_fd: &VmFd,
     ) -> Result<Self> {
         let irqfd = Arc::new(EventFd::new(EFD_NONBLOCK).map_err(Error::EventFd)?);
 

@@ -1,14 +1,10 @@
-use super::{Error, Result};
+use super::{Error, MmioConfig, Result};
 use linux_loader::cmdline;
 use vm_memory::{Address, GuestAddress, GuestUsize};
 
-pub fn register_mmio_device(
-    size: GuestUsize,
-    baseaddr: GuestAddress,
-    irq: u32,
-    id: Option<u32>,
-) -> Result<String> {
+pub fn register_mmio_device(mmio_cfg: MmioConfig, irq: u32, id: Option<u32>) -> Result<String> {
     // !TODO Register to MmioManager
+    let size = mmio_cfg.range.size();
 
     // Pass to kernel command line
     if size == 0 {
@@ -18,7 +14,7 @@ pub fn register_mmio_device(
     let mut device_str = format!(
         "virtio_mmio.device={}@0x{:x?}:{}",
         guestusize_to_str(size),
-        baseaddr.raw_value(),
+        GuestAddress(mmio_cfg.range.base().0).raw_value(),
         irq
     );
     if let Some(id) = id {
