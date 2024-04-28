@@ -8,7 +8,6 @@ use std::time::Duration;
 use std::{
     convert::From,
     env::current_dir,
-    env::current_dir,
     net::Ipv4Addr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -82,27 +81,37 @@ impl VmmServiceTrait for VmmService {
         
         // define initramfs file placement
         let initramfs_entire_file_path = curr_dir.as_mut_os_string();
-        initramfs_entire_file_path.push("/tools/rootfs/initramfs.img");
+        initramfs_entire_file_path.push("/tools/rootfs/");
+
+        // get request with the language
+        let req: RunVmmRequest = request.into_inner();
+        let language: Language = Language::from_i32(req.language).expect("Unknown language");
+
+        let image = match language {
+            Language::Rust    => {
+                initramfs_entire_file_path.push("rust.img");
+                "rust:alpine"
+            },
+            Language::Python  => {
+                initramfs_entire_file_path.push("python.img");
+                "python:alpine"
+            },
+            Language::Node    => {
+                initramfs_entire_file_path.push("node.img");
+                "node:alpine"
+            },
+        };
         
         // Check if the initramfs is on the system, else build it
         let initramfs_exists = Path::new(&initramfs_entire_file_path).try_exists().expect(&format!("Could not access folder {:?}", &initramfs_entire_file_path));
         if !initramfs_exists
         {
-            // get request with the language
-            let req: RunVmmRequest = request.into_inner();
-            let language: Language = Language::from_i32(req.language).expect("Unknown language");
-
-            let image = match language {
-                Language::Rust    => "rust:alpine",
-                Language::Python  => "python:alpine",
-                Language::Node    => "node:alpine",
-            };
-
             info!("Initramfs not found, building initramfs");
             // Execute the script using sh and capture output and error streams
             let output = Command::new("sh")
                 .arg("./tools/rootfs/mkrootfs.sh")
                 .arg(image)
+                .arg(&initramfs_entire_file_path)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .output()
@@ -117,7 +126,7 @@ impl VmmServiceTrait for VmmService {
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
         // Configure the VMM parameters might need to be calculated rather than hardcoded
-        vmm.configure(1, 512, kernel_path, &Some(initramfs_path))
+        vmm.configure(2, 4000, kernel_path, &Some(initramfs_path))
             .map_err(VmmErrors::VmmConfigure)?;
 
         // Run the VMM in a separate task
