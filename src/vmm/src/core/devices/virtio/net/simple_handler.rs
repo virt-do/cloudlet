@@ -3,16 +3,17 @@
 
 use std::cmp;
 use std::io::{self, Read, Write};
+use std::ops::Deref;
 use std::result;
+use std::sync::Arc;
 
 use log::warn;
-use virtio_queue::{DescriptorChain, Queue};
-use vm_memory::{Bytes, GuestAddressSpace};
+use virtio_queue::{DescriptorChain, Queue, QueueOwnedT, QueueT};
+use vm_memory::{Bytes, GuestAddressSpace, GuestMemory};
 
-use crate::core::devices::virtio::SignalUsedQueue;
-use crate::core::network::tap::Tap;
-
+use super::tuntap::tap::Tap;
 use super::{RXQ_INDEX, TXQ_INDEX};
+use crate::core::devices::virtio::SignalUsedQueue;
 
 // use crate::virtio::net::tap::Tap;
 // use crate::virtio::net::{RXQ_INDEX, TXQ_INDEX};
@@ -44,7 +45,12 @@ impl From<virtio_queue::Error> for Error {
 // the way queue notification is implemented. The backend is not yet generic (we always assume a
 // `Tap` object), but we're looking at improving that going forward.
 // TODO: Find a better name.
-pub struct SimpleHandler<M: GuestAddressSpace, S: SignalUsedQueue> {
+pub struct SimpleHandler<M, S>
+where
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    S: SignalUsedQueue,
+    <M as Deref>::Target: GuestMemory,
+{
     pub driver_notify: S,
     pub rxq: Queue,
     pub rxbuf_current: usize,
@@ -52,10 +58,16 @@ pub struct SimpleHandler<M: GuestAddressSpace, S: SignalUsedQueue> {
     pub txq: Queue,
     pub txbuf: [u8; MAX_BUFFER_SIZE],
     pub tap: Tap,
+    pub mem: Arc<M>,
 }
 
-impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
-    pub fn new(driver_notify: S, rxq: Queue, txq: Queue, tap: Tap) -> Self {
+impl<M, S> SimpleHandler<M, S>
+where
+    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy,
+    S: SignalUsedQueue,
+    <M as Deref>::Target: GuestMemory,
+{
+    pub fn new(driver_notify: S, rxq: Queue, txq: Queue, tap: Tap, mem: Arc<M>) -> Self {
         SimpleHandler {
             driver_notify,
             rxq,
@@ -64,6 +76,7 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
             txq,
             txbuf: [0u8; MAX_BUFFER_SIZE],
             tap,
+            mem,
         }
     }
 
@@ -74,7 +87,7 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
     fn write_frame_to_guest(&mut self) -> result::Result<bool, Error> {
         let num_bytes = self.rxbuf_current;
 
-        let mut chain = match self.rxq.iter()?.next() {
+        let mut chain = match self.rxq.iter(self.mem.to_owned())?.next() {
             Some(c) => c,
             _ => return Ok(false),
         };
@@ -103,7 +116,8 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
             warn!("rx frame too large");
         }
 
-        self.rxq.add_used(chain.head_index(), count as u32)?;
+        self.rxq
+            .add_used(self.mem.as_ref(), chain.head_index(), count as u32)?;
 
         self.rxbuf_current = 0;
 
@@ -113,7 +127,7 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
     pub fn process_tap(&mut self) -> result::Result<(), Error> {
         loop {
             if self.rxbuf_current == 0 {
-                match self.tap.read(&mut self.rxbuf) {
+                match self.tap.read_to_end(&mut self.rxbuf.to_vec()) {
                     Ok(n) => self.rxbuf_current = n,
                     Err(_) => {
                         // TODO: Do something (logs, metrics, etc.) in response to an error when
@@ -124,12 +138,12 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
                 }
             }
 
-            if !self.write_frame_to_guest()? && !self.rxq.enable_notification()? {
+            if !self.write_frame_to_guest()? && !self.rxq.enable_notification(self.mem.as_ref())? {
                 break;
             }
         }
 
-        if self.rxq.needs_notification()? {
+        if self.rxq.needs_notification(self.mem.as_ref())? {
             self.driver_notify.signal_used_queue(RXQ_INDEX);
         }
 
@@ -138,7 +152,7 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
 
     fn send_frame_from_chain(
         &mut self,
-        chain: &mut DescriptorChain<M::T>,
+        chain: &mut DescriptorChain<Arc<M>>,
     ) -> result::Result<u32, Error> {
         let mut count = 0;
 
@@ -159,33 +173,36 @@ impl<M: GuestAddressSpace, S: SignalUsedQueue> SimpleHandler<M, S> {
             count += len;
         }
 
-        self.tap.write(&self.txbuf[..count]).map_err(Error::Tap)?;
+        self.tap
+            .write_all(&self.txbuf[..count])
+            .map_err(Error::Tap)?;
 
         Ok(count as u32)
     }
 
     pub fn process_txq(&mut self) -> result::Result<(), Error> {
         loop {
-            self.txq.disable_notification()?;
+            self.txq.disable_notification(self.mem.as_ref())?;
 
-            while let Some(mut chain) = self.txq.iter()?.next() {
+            while let Some(mut chain) = self.txq.iter(self.mem.to_owned())?.next() {
                 self.send_frame_from_chain(&mut chain)?;
 
-                self.txq.add_used(chain.head_index(), 0)?;
+                self.txq
+                    .add_used(self.mem.as_ref(), chain.head_index(), 0)?;
 
-                if self.txq.needs_notification()? {
+                if self.txq.needs_notification(self.mem.as_ref())? {
                     self.driver_notify.signal_used_queue(TXQ_INDEX);
                 }
             }
 
-            if !self.txq.enable_notification()? {
+            if !self.txq.enable_notification(self.mem.as_ref())? {
                 return Ok(());
             }
         }
     }
 
     pub fn process_rxq(&mut self) -> result::Result<(), Error> {
-        self.rxq.disable_notification()?;
+        self.rxq.disable_notification(self.mem.as_ref())?;
         self.process_tap()
     }
 }

@@ -3,7 +3,7 @@
 use std::io;
 
 pub(crate) mod serial;
-pub mod virtio;
+pub(crate) mod virtio;
 
 #[derive(Debug)]
 /// Devices errors.

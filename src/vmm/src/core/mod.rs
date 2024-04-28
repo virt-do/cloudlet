@@ -8,14 +8,13 @@ extern crate vm_superio;
 use linux_loader::loader;
 use std::io;
 
-use self::network::open_tap;
+use self::devices::virtio::net::tuntap::open_tap;
 
 mod cpu;
 mod devices;
 mod epoll_context;
 mod irq_allocator;
 mod kernel;
-mod network;
 mod slip_pty;
 pub mod vmm;
 

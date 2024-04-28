@@ -17,14 +17,14 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tracing::info;
 use vm_allocator::{AddressAllocator, AllocPolicy};
-use vm_device::bus::{MmioAddress, MmioRange};
+// use vm_device::bus::{MmioAddress, MmioRange};
 use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
 use vmm_sys_util::terminal::Terminal;
 
-use super::devices::virtio::net::device::Net;
+// use super::devices::virtio::net::device::Net;
+use super::devices::virtio::net::tuntap::open_tap::open_tap;
+use super::devices::virtio::net::tuntap::tap::Tap;
 use super::irq_allocator::IrqAllocator;
-use super::network::open_tap::open_tap;
-use super::network::tap::Tap;
 use super::slip_pty::SlipPty;
 
 #[cfg(target_arch = "x86_64")]
@@ -323,8 +323,8 @@ impl VMM {
         self.configure_memory(mem_size_mb)?;
         self.configure_allocators(mem_size_mb)?;
 
-        let vmmio_parameter = self.configure_net_device().unwrap();
-        cmdline_extra_parameters.push(vmmio_parameter);
+        // let vmmio_parameter = self.configure_net_device().unwrap();
+        // cmdline_extra_parameters.push(vmmio_parameter);
 
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
@@ -338,23 +338,23 @@ impl VMM {
         Ok(())
     }
 
-    pub fn configure_net_device(&mut self) -> Result<String> {
-        let mem = Arc::new(self.guest_memory.clone());
-        let range = if let Some(allocator) = &self.address_allocator {
-            allocator
-                .to_owned()
-                .allocate(0x1000, DEFAULT_ADDRESS_ALIGNEMNT, DEFAULT_ALLOC_POLICY)
-                .unwrap()
-        } else {
-            // Handle the case where self.address_allocator is None
-            panic!("Address allocator is not initialized");
-        };
-        let _mmio_range = MmioRange::new(MmioAddress(range.start()), range.len()).unwrap();
-        let irq = self.irq_allocator.next_irq().unwrap();
+    // pub fn configure_net_device(&mut self) -> Result<String> {
+    //     let mem = Arc::new(self.guest_memory.clone());
+    //     let range = if let Some(allocator) = &self.address_allocator {
+    //         allocator
+    //             .to_owned()
+    //             .allocate(0x1000, DEFAULT_ADDRESS_ALIGNEMNT, DEFAULT_ALLOC_POLICY)
+    //             .unwrap()
+    //     } else {
+    //         // Handle the case where self.address_allocator is None
+    //         panic!("Address allocator is not initialized");
+    //     };
+    //     let _mmio_range = MmioRange::new(MmioAddress(range.start()), range.len()).unwrap();
+    //     let irq = self.irq_allocator.next_irq().unwrap();
 
-        // !TODO: MMIO Device Discovery + MMIO Device Register Layout
-        let net = Net::new(range.len(), GuestAddress(range.start()), irq, mem).unwrap();
+    //     // !TODO: MMIO Device Discovery + MMIO Device Register Layout
+    //     let net = Net::new(range.len(), GuestAddress(range.start()), irq, mem).unwrap();
 
-        Ok(net.get_vmmio_parameter())
-    }
+    //     Ok(net.get_vmmio_parameter())
+    // }
 }

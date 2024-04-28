@@ -1,20 +1,41 @@
-use linux_loader::cmdline;
+pub(crate) mod net;
+mod register;
+
+use event_manager::{
+    Error as EvmgrError, MutEventSubscriber, RemoteEndpoint, Result as EvmgrResult, SubscriberId,
+};
+use kvm_ioctls::{IoEventAddress, VmFd};
+use libc::EFD_NONBLOCK;
 use std::{
-    io, result,
+    io,
     sync::{
         atomic::{AtomicU8, Ordering},
-        Arc,
+        Arc, Mutex,
     },
 };
-use virtio_bindings::virtio_mmio::VIRTIO_MMIO_INT_VRING;
-use vm_device::bus;
-use vm_memory::{Address, GuestAddress, GuestUsize};
+use virtio_device::VirtioConfig;
+use virtio_queue::{Queue, QueueT};
+use vm_device::bus::{self, MmioAddress, MmioRange};
 use vmm_sys_util::{errno, eventfd::EventFd};
 
-pub mod net;
+// Device-independent virtio features.
+mod features {
+    pub const VIRTIO_F_RING_EVENT_IDX: u64 = 29;
+    pub const VIRTIO_F_VERSION_1: u64 = 32;
+    pub const VIRTIO_F_IN_ORDER: u64 = 35;
+}
 
-pub type Result<T> = result::Result<T, Error>;
+// This bit is set on the device interrupt status when notifying the driver about used
+// queue events.
+// TODO: There seem to be similar semantics when the PCI transport is used with MSI-X cap
+// disabled. Let's figure out at some point if having MMIO as part of the name is necessary.
+const VIRTIO_MMIO_INT_VRING: u8 = 0x01;
 
+// The driver will write to the register at this offset in the MMIO region to notify the device
+// about available queue events.
+const VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET: u64 = 0x50;
+
+// TODO: Make configurable for each device maybe?
 const QUEUE_MAX_SIZE: u16 = 256;
 
 #[derive(Debug)]
@@ -23,7 +44,7 @@ pub enum Error {
     BadFeatures(u64),
     Bus(bus::Error),
     Cmdline(linux_loader::cmdline::Error),
-    // Endpoint(EvmgrError),
+    Endpoint(EvmgrError),
     EventFd(io::Error),
     Overflow,
     QueuesNotValid,
@@ -31,46 +52,122 @@ pub enum Error {
     RegisterIrqfd(errno::Error),
 }
 
-pub fn register_mmio_device(
-    size: GuestUsize,
-    baseaddr: GuestAddress,
-    irq: u32,
-    id: Option<u32>,
-) -> Result<String> {
-    // !TODO Register to MmioManager
+pub type Result<T> = std::result::Result<T, Error>;
+pub type Subscriber = Arc<Mutex<dyn MutEventSubscriber + Send>>;
 
-    // Pass to kernel command line
-    if size == 0 {
-        return Err(cmdline::Error::MmioSize);
-    }
-
-    let mut device_str = format!(
-        "virtio_mmio.device={}@0x{:x?}:{}",
-        guestusize_to_str(size),
-        baseaddr.raw_value(),
-        irq
-    );
-    if let Some(id) = id {
-        device_str.push_str(format!(":{}", id).as_str());
-    }
-    Ok(device_str)
+#[derive(Copy, Clone)]
+pub struct MmioConfig {
+    pub range: MmioRange,
+    // The interrupt assigned to the device.
+    pub gsi: u32,
 }
 
-fn guestusize_to_str(size: GuestUsize) -> String {
-    const KB_MULT: u64 = 1 << 10;
-    const MB_MULT: u64 = KB_MULT << 10;
-    const GB_MULT: u64 = MB_MULT << 10;
+impl MmioConfig {
+    pub fn new(base: u64, size: u64, gsi: u32) -> Result<Self> {
+        MmioRange::new(MmioAddress(base), size)
+            .map(|range| MmioConfig { range, gsi })
+            .map_err(Error::Bus)
+    }
 
-    if size % GB_MULT == 0 {
-        return format!("{}G", size / GB_MULT);
+    pub fn next(&self) -> Result<Self> {
+        let range = self.range;
+        let next_start = range
+            .base()
+            .0
+            .checked_add(range.size())
+            .ok_or(Error::Overflow)?;
+        Self::new(next_start, range.size(), self.gsi + 1)
     }
-    if size % MB_MULT == 0 {
-        return format!("{}M", size / MB_MULT);
+}
+
+struct Config {
+    virtio: VirtioConfig<Queue>,
+    mmio: MmioConfig,
+    endpoint: RemoteEndpoint<Subscriber>,
+    vm_fd: Arc<VmFd>,
+    irqfd: Arc<EventFd>,
+}
+
+impl Config {
+    pub fn new(
+        virtio_cfg: VirtioConfig<Queue>,
+        mmio: MmioConfig,
+        endpoint: RemoteEndpoint<Subscriber>,
+        vm_fd: Arc<VmFd>,
+    ) -> Result<Self> {
+        let irqfd = Arc::new(EventFd::new(EFD_NONBLOCK).map_err(Error::EventFd)?);
+
+        Ok(Self {
+            virtio: virtio_cfg,
+            mmio,
+            endpoint,
+            vm_fd,
+            irqfd,
+        })
     }
-    if size % KB_MULT == 0 {
-        return format!("{}K", size / KB_MULT);
+
+    // Perform common initial steps for device activation based on the configuration, and return
+    // a `Vec` that contains `EventFd`s registered as ioeventfds, which are used to convey queue
+    // notifications coming from the driver.
+    pub fn prepare_activate(&self) -> Result<Vec<EventFd>> {
+        if self.virtio.queues.iter().all(|queue| !queue.ready()) {
+            return Err(Error::QueuesNotValid);
+        }
+
+        if self.virtio.device_activated {
+            return Err(Error::AlreadyActivated);
+        }
+
+        // We do not support legacy drivers.
+        if self.virtio.driver_features & (1 << features::VIRTIO_F_VERSION_1) == 0 {
+            return Err(Error::BadFeatures(self.virtio.driver_features));
+        }
+
+        let mut ioevents = Vec::new();
+
+        // Right now, we operate under the assumption all queues are marked ready by the device
+        // (which is true until we start supporting devices that can optionally make use of
+        // additional queues on top of the defaults).
+        for i in 0..self.virtio.queues.len() {
+            let fd = EventFd::new(EFD_NONBLOCK).map_err(Error::EventFd)?;
+
+            // Register the queue event fd.
+            self.vm_fd
+                .register_ioevent(
+                    &fd,
+                    &IoEventAddress::Mmio(
+                        self.mmio.range.base().0 + VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET,
+                    ),
+                    // The maximum number of queues should fit within an `u16` according to the
+                    // standard, so the conversion below is always expected to succeed.
+                    u32::try_from(i).unwrap(),
+                )
+                .map_err(Error::RegisterIoevent)?;
+
+            ioevents.push(fd);
+        }
+
+        Ok(ioevents)
     }
-    size.to_string()
+
+    // Perform the final steps of device activation based on the inner configuration and the
+    // provided subscriber that's going to handle the device queues. We'll extend this when
+    // we start support devices that make use of multiple handlers (i.e. for multiple queues).
+    pub fn finalize_activate(&mut self, handler: Subscriber) -> Result<()> {
+        // Register the queue handler with the `EventManager`. We could record the `sub_id`
+        // (and/or keep a handler clone) for further interaction (i.e. to remove the subscriber at
+        // a later time, retrieve state, etc).
+        let _sub_id = self
+            .endpoint
+            .call_blocking(move |mgr| -> EvmgrResult<SubscriberId> {
+                Ok(mgr.add_subscriber(handler))
+            })
+            .map_err(Error::Endpoint)?;
+
+        self.virtio.device_activated = true;
+
+        Ok(())
+    }
 }
 
 /// Simple trait to model the operation of signalling the driver about used events

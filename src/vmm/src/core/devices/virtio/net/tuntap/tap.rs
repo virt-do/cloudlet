@@ -5,10 +5,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the THIRD-PARTY file.
 
+use super::mac::MacAddr;
+use super::mac::MAC_ADDR_LEN;
+use super::net_gen;
 use super::{create_inet_socket, create_sockaddr, create_unix_socket, Error as NetUtilError};
-use crate::core::network::mac::MacAddr;
-use crate::core::network::mac::MAC_ADDR_LEN;
-use crate::core::network::net_gen;
 use std::fs::File;
 use std::io::{Error as IoError, Read, Result as IoResult, Write};
 use std::net;
