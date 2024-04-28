@@ -6,6 +6,7 @@ use event_manager::{
 };
 use kvm_ioctls::{IoEventAddress, VmFd};
 use libc::EFD_NONBLOCK;
+use log::info;
 use std::{
     io,
     sync::{
@@ -80,25 +81,29 @@ impl MmioConfig {
     }
 }
 
-struct Config<'a> {
+pub struct Config {
     virtio: VirtioConfig<Queue>,
-    mmio: MmioConfig,
+    pub mmio: MmioConfig,
     endpoint: RemoteEndpoint<Subscriber>,
-    vm_fd: &'a VmFd,
-    irqfd: Arc<EventFd>,
+    vm_fd: Arc<VmFd>,
+    pub irqfd: Arc<EventFd>,
 }
 
-impl<'a> Config<'a> {
+impl Config {
     pub fn new(
-        virtio_cfg: VirtioConfig<Queue>,
+        virtio: VirtioConfig<Queue>,
         mmio: MmioConfig,
         endpoint: RemoteEndpoint<Subscriber>,
-        vm_fd: &VmFd,
+        vm_fd: Arc<VmFd>,
     ) -> Result<Self> {
         let irqfd = Arc::new(EventFd::new(EFD_NONBLOCK).map_err(Error::EventFd)?);
 
+        // vm_fd
+        //     .register_irqfd(&irqfd, mmio.gsi)
+        //     .map_err(Error::RegisterIrqfd)?;
+
         Ok(Self {
-            virtio: virtio_cfg,
+            virtio,
             mmio,
             endpoint,
             vm_fd,
@@ -190,6 +195,7 @@ impl SignalUsedQueue for SingleFdSignalQueue {
     fn signal_used_queue(&self, _index: u16) {
         self.interrupt_status
             .fetch_or(VIRTIO_MMIO_INT_VRING, Ordering::SeqCst);
+
         self.irqfd
             .write(1)
             .expect("Failed write to eventfd when signalling queue");

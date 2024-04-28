@@ -19,14 +19,11 @@ use std::thread;
 use tracing::info;
 use vm_allocator::{AddressAllocator, AllocPolicy};
 use vm_device::bus::{MmioAddress, MmioRange};
-use vm_memory::{
-    Address, GuestAddress, GuestAddressSpace, GuestMemory, GuestMemoryMmap, GuestMemoryRegion,
-};
+use vm_device::device_manager::IoManager;
+use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemoryRegion};
 use vmm_sys_util::terminal::Terminal;
 
 use super::devices::virtio::net::device::Net;
-use super::devices::virtio::net::tuntap::open_tap::open_tap;
-use super::devices::virtio::net::tuntap::tap::Tap;
 use super::devices::virtio::MmioConfig;
 use super::irq_allocator::IrqAllocator;
 use super::slip_pty::SlipPty;
@@ -50,15 +47,18 @@ const SERIAL_IRQ: u32 = 4;
 const IRQ_MAX: u8 = 23;
 
 pub struct VMM {
-    vm_fd: VmFd,
+    vm_fd: Arc<VmFd>,
     kvm: Kvm,
     guest_memory: GuestMemoryMmap,
     address_allocator: Option<AddressAllocator>,
     irq_allocator: IrqAllocator,
-    event_mgr: EventManager<Arc<Mutex<dyn MutEventSubscriber + Send>>>,
+    device_mgr: Arc<Mutex<IoManager>>,
+    event_mgr: Arc<Mutex<EventManager<Arc<Mutex<dyn MutEventSubscriber + Send>>>>>,
     vcpus: Vec<Vcpu>,
-    _tap: Tap,
 
+    tap_ip_addr: Ipv4Addr,
+    tap_netmask: Ipv4Addr,
+    net_devices: Vec<Arc<Mutex<Net>>>,
     serial: Arc<Mutex<LumperSerial<Stdout>>>,
     slip_pty: Arc<Mutex<SlipPty>>,
     epoll: EpollContext,
@@ -72,17 +72,7 @@ impl VMM {
 
         // Create a KVM VM object.
         // KVM returns a file descriptor to the VM object.
-        let vm_fd = kvm.create_vm().map_err(Error::KvmIoctl)?;
-
-        let tap = open_tap(
-            None,
-            Some(tap_ip_addr),
-            Some(tap_netmask),
-            &mut None,
-            None,
-            None,
-        )
-        .map_err(Error::OpenTap)?;
+        let vm_fd = Arc::new(kvm.create_vm().map_err(Error::KvmIoctl)?);
 
         let slip_pty = SlipPty::new()?;
 
@@ -102,21 +92,25 @@ impl VMM {
             .map_err(Error::EpollError)?;
 
         let irq_allocator = IrqAllocator::new(SERIAL_IRQ, IRQ_MAX.into()).unwrap();
+        let device_mgr = Arc::new(Mutex::new(IoManager::new()));
 
         let vmm = VMM {
             vm_fd,
             kvm,
             guest_memory: GuestMemoryMmap::default(),
             address_allocator: None,
+            device_mgr,
             irq_allocator,
-            event_mgr: EventManager::new().unwrap(),
+            event_mgr: Arc::new(Mutex::new(EventManager::new().unwrap())),
             vcpus: vec![],
-            _tap: tap,
             serial: Arc::new(Mutex::new(
                 LumperSerial::new(stdout()).map_err(Error::SerialCreation)?,
             )),
             slip_pty: Arc::new(Mutex::new(slip_pty)),
             epoll,
+            tap_ip_addr,
+            tap_netmask,
+            net_devices: Vec::new(),
         };
 
         Ok(vmm)
@@ -201,6 +195,14 @@ impl VMM {
             )
             .map_err(Error::KvmIoctl)?;
 
+        for net in self.net_devices.iter() {
+            let net_cfg = &net.lock().unwrap().config;
+
+            self.vm_fd
+                .register_irqfd(&net_cfg.irqfd, net_cfg.mmio.gsi)
+                .map_err(Error::KvmIoctl)?;
+        }
+
         Ok(())
     }
 
@@ -217,6 +219,7 @@ impl VMM {
             let vcpu = Vcpu::new(
                 &self.vm_fd,
                 index.into(),
+                self.device_mgr.clone(),
                 Arc::clone(&self.serial),
                 Arc::clone(&self.slip_pty),
             )
@@ -267,6 +270,17 @@ impl VMM {
             .map_err(Error::TerminalConfigure)?;
         let mut events = [epoll::Event::new(epoll::Events::empty(), 0); EPOLL_EVENTS_LEN];
         let epoll_fd = self.epoll.as_raw_fd();
+
+        let event_mgr = self.event_mgr.clone();
+        let _ = thread::Builder::new().spawn(move || loop {
+            match event_mgr.lock().unwrap().run() {
+                Ok(_) => (),
+                Err(e) => eprintln!("Failed to handle events: {:?}", e),
+            }
+            // if !self.exit_handler.keep_running() {
+            //     break;
+            // }
+        });
 
         // Let's start the STDIN polling thread.
         loop {
@@ -324,13 +338,11 @@ impl VMM {
         kernel_path: &Path,
         initramfs_path: &Option<PathBuf>,
     ) -> Result<()> {
-        let mut cmdline_extra_parameters = Vec::new();
+        let cmdline_extra_parameters = &mut Vec::new();
 
         self.configure_memory(mem_size_mb)?;
         self.configure_allocators(mem_size_mb)?;
-
-        // let vmmio_parameter = self.configure_net_device().unwrap();
-        // cmdline_extra_parameters.push(vmmio_parameter);
+        self.configure_net_device("tap0".to_string(), cmdline_extra_parameters)?;
 
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
@@ -344,7 +356,11 @@ impl VMM {
         Ok(())
     }
 
-    pub fn configure_net_device(&mut self, tap_name: String) -> Result<String> {
+    pub fn configure_net_device(
+        &mut self,
+        tap_name: String,
+        cmdline_extra_parameters: &mut Vec<String>,
+    ) -> Result<()> {
         let mem = Arc::new(self.guest_memory.clone());
         let range = if let Some(allocator) = &self.address_allocator {
             allocator
@@ -361,20 +377,26 @@ impl VMM {
             range: mmio_range,
             gsi: irq,
         };
-
         // let mut guard = self.device_mgr.lock().unwrap();
+        // let vm_fd = Arc::clone(&self.vm_fd);
 
         // !TODO: MMIO Device Discovery + MMIO Device Register Layout
         let net = Net::new(
-            mem.memory(),
+            mem,
+            self.device_mgr.clone(),
             mmio_cfg,
             tap_name,
+            self.tap_ip_addr,
+            self.tap_netmask,
             irq,
-            self.event_mgr.remote_endpoint(),
-            &self.vm_fd,
+            self.event_mgr.lock().unwrap().remote_endpoint(),
+            self.vm_fd.clone(),
+            cmdline_extra_parameters,
         )
         .unwrap();
 
-        Ok("net.get_vmmio_parameter()".to_string())
+        self.net_devices.push(net);
+
+        Ok(())
     }
 }

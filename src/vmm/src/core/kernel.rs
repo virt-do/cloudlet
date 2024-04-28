@@ -42,7 +42,7 @@ const HIMEM_START: u64 = 0x0010_0000; // 1 MB
 /// Address where the kernel command line is written.
 const CMDLINE_START: u64 = 0x0002_0000;
 // Default command line
-const DEFAULT_CMDLINE: &str = "console=ttyS0 i8042.nokbd reboot=k panic=1 pci=off";
+const DEFAULT_CMDLINE: &str = "console=ttyS0 i8042.nokbd reboot=k panic=1 pci=off ip=172.29.0.2::172.29.0.1:255.255.0.0::eth0:off";
 
 fn add_e820_entry(
     params: &mut boot_params,
@@ -127,7 +127,7 @@ pub fn kernel_setup(
     guest_memory: &GuestMemoryMmap,
     kernel_path: PathBuf,
     initramfs_path: Option<PathBuf>,
-    cmdline_extra_parameters: Vec<String>,
+    cmdline_extra_parameters: &mut Vec<String>,
 ) -> Result<KernelLoaderResult> {
     let mut kernel_image = File::open(kernel_path).map_err(Error::IO)?;
     let zero_page_addr = GuestAddress(ZEROPG_START);
@@ -146,7 +146,7 @@ pub fn kernel_setup(
 
     let combined_cmdline: String = {
         let mut combined = DEFAULT_CMDLINE.to_string();
-        for param in &cmdline_extra_parameters {
+        for param in cmdline_extra_parameters {
             combined.push(' ');
             combined.push_str(param);
         }

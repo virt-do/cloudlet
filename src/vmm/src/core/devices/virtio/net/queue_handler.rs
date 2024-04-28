@@ -1,11 +1,9 @@
 // Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
 
-use std::ops::Deref;
-
 use event_manager::{EventOps, Events, MutEventSubscriber};
-use log::error;
-use vm_memory::{GuestAddressSpace, GuestMemory};
+use log::{error, info};
+use std::os::fd::AsRawFd;
 use vmm_sys_util::epoll::EventSet;
 use vmm_sys_util::eventfd::EventFd;
 
@@ -17,22 +15,18 @@ const TAPFD_DATA: u32 = 0;
 const RX_IOEVENT_DATA: u32 = 1;
 const TX_IOEVENT_DATA: u32 = 2;
 
-pub struct QueueHandler<M, S>
+pub struct QueueHandler<S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
-    <M as Deref>::Target: GuestMemory,
 {
-    pub inner: SimpleHandler<M, S>,
+    pub inner: SimpleHandler<S>,
     pub rx_ioevent: EventFd,
     pub tx_ioevent: EventFd,
 }
 
-impl<M, S> QueueHandler<M, S>
+impl<S> QueueHandler<S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
-    <M as Deref>::Target: GuestMemory,
 {
     // Helper method that receives an error message to be logged and the `ops` handle
     // which is used to unregister all events.
@@ -42,16 +36,14 @@ where
             .expect("Failed to remove rx ioevent");
         ops.remove(Events::empty(&self.tx_ioevent))
             .expect("Failed to remove tx ioevent");
-        ops.remove(Events::empty(&self.inner.tap))
+        ops.remove(Events::empty(&self.inner.tap.lock().unwrap().as_raw_fd()))
             .expect("Failed to remove tap event");
     }
 }
 
-impl<M, S> MutEventSubscriber for QueueHandler<M, S>
+impl<S> MutEventSubscriber for QueueHandler<S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
-    <M as Deref>::Target: GuestMemory,
 {
     fn process(&mut self, events: Events, ops: &mut EventOps) {
         // TODO: We can also consider panicking on the errors that cannot be generated
@@ -89,7 +81,7 @@ where
 
     fn init(&mut self, ops: &mut EventOps) {
         ops.add(Events::with_data(
-            &self.inner.tap,
+            &self.inner.tap.lock().unwrap().as_raw_fd(),
             TAPFD_DATA,
             EventSet::IN | EventSet::EDGE_TRIGGERED,
         ))

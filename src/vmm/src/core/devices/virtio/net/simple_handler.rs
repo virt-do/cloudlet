@@ -3,13 +3,12 @@
 
 use std::cmp;
 use std::io::{self, Read, Write};
-use std::ops::Deref;
 use std::result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-use log::warn;
+use log::{info, warn};
 use virtio_queue::{DescriptorChain, Queue, QueueOwnedT, QueueT};
-use vm_memory::{Bytes, GuestAddressSpace, GuestMemory};
+use vm_memory::{Bytes, GuestAddressSpace, GuestMemoryMmap};
 
 use super::tuntap::tap::Tap;
 use super::{RXQ_INDEX, TXQ_INDEX};
@@ -45,11 +44,9 @@ impl From<virtio_queue::Error> for Error {
 // the way queue notification is implemented. The backend is not yet generic (we always assume a
 // `Tap` object), but we're looking at improving that going forward.
 // TODO: Find a better name.
-pub struct SimpleHandler<M, S>
+pub struct SimpleHandler<S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
-    <M as Deref>::Target: GuestMemory,
 {
     pub driver_notify: S,
     pub rxq: Queue,
@@ -57,17 +54,21 @@ where
     pub rxbuf: [u8; MAX_BUFFER_SIZE],
     pub txq: Queue,
     pub txbuf: [u8; MAX_BUFFER_SIZE],
-    pub tap: Tap,
-    pub mem: Arc<M>,
+    pub tap: Arc<Mutex<Tap>>,
+    pub mem: Arc<GuestMemoryMmap>,
 }
 
-impl<M, S> SimpleHandler<M, S>
+impl<S> SimpleHandler<S>
 where
-    M: GuestAddressSpace<T = M> + Clone + Deref + GuestMemory + Copy + Sync,
     S: SignalUsedQueue,
-    <M as Deref>::Target: GuestMemory,
 {
-    pub fn new(driver_notify: S, rxq: Queue, txq: Queue, tap: Tap, mem: Arc<M>) -> Self {
+    pub fn new(
+        driver_notify: S,
+        rxq: Queue,
+        txq: Queue,
+        tap: Arc<Mutex<Tap>>,
+        mem: Arc<GuestMemoryMmap>,
+    ) -> Self {
         SimpleHandler {
             driver_notify,
             rxq,
@@ -87,7 +88,7 @@ where
     fn write_frame_to_guest(&mut self) -> result::Result<bool, Error> {
         let num_bytes = self.rxbuf_current;
 
-        let mut chain = match self.rxq.iter(self.mem.to_owned())?.next() {
+        let mut chain = match self.rxq.iter(self.mem.memory())?.next() {
             Some(c) => c,
             _ => return Ok(false),
         };
@@ -116,8 +117,9 @@ where
             warn!("rx frame too large");
         }
 
+        let mem_ref = Arc::as_ref(&self.mem);
         self.rxq
-            .add_used(self.mem.as_ref(), chain.head_index(), count as u32)?;
+            .add_used(mem_ref, chain.head_index(), count as u32)?;
 
         self.rxbuf_current = 0;
 
@@ -127,9 +129,9 @@ where
     pub fn process_tap(&mut self) -> result::Result<(), Error> {
         loop {
             if self.rxbuf_current == 0 {
-                match self.tap.read_to_end(&mut self.rxbuf.to_vec()) {
+                match self.tap.lock().unwrap().read(&mut self.rxbuf) {
                     Ok(n) => self.rxbuf_current = n,
-                    Err(_) => {
+                    Err(e) => {
                         // TODO: Do something (logs, metrics, etc.) in response to an error when
                         // reading from tap. EAGAIN means there's nothing available to read anymore
                         // (because we open the TAP as non-blocking).
@@ -152,11 +154,11 @@ where
 
     fn send_frame_from_chain(
         &mut self,
-        chain: &mut DescriptorChain<Arc<M>>,
+        mut chain: DescriptorChain<Arc<GuestMemoryMmap>>,
     ) -> result::Result<u32, Error> {
         let mut count = 0;
 
-        while let Some(desc) = chain.next() {
+        while let Some(desc) = chain.by_ref().next() {
             let left = self.txbuf.len() - count;
             let len = desc.len() as usize;
 
@@ -174,6 +176,8 @@ where
         }
 
         self.tap
+            .lock()
+            .unwrap()
             .write_all(&self.txbuf[..count])
             .map_err(Error::Tap)?;
 
@@ -184,8 +188,8 @@ where
         loop {
             self.txq.disable_notification(self.mem.as_ref())?;
 
-            while let Some(mut chain) = self.txq.iter(self.mem.to_owned())?.next() {
-                self.send_frame_from_chain(&mut chain)?;
+            while let Some(chain) = self.txq.iter(self.mem.memory())?.next() {
+                self.send_frame_from_chain(chain.clone())?;
 
                 self.txq
                     .add_used(self.mem.as_ref(), chain.head_index(), 0)?;
