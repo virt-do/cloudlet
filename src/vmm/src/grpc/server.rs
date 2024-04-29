@@ -57,7 +57,7 @@ impl VmmServiceTrait for VmmService {
         kernel_entire_path.push("/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
 
         // Check if the kernel is on the system, else build it
-        let kernel_exists = Path::new(&kernel_entire_path).try_exists().expect(&format!("Could not access folder {:?}", &kernel_entire_path));
+        let kernel_exists = Path::new(&kernel_entire_path).try_exists().unwrap_or_else(|_| panic!("Could not access folder {:?}", &kernel_entire_path));
         if !kernel_exists
         {
             info!("Kernel not found, building kernel");
@@ -99,14 +99,14 @@ impl VmmServiceTrait for VmmService {
         };
 
 
-        let rootfs_exists = Path::new(&initramfs_entire_file_path).try_exists().expect(&format!("Could not access file {:?}", &initramfs_entire_file_path));
+        let rootfs_exists = Path::new(&initramfs_entire_file_path).try_exists().unwrap_or_else(|_| panic!("Could not access folder {:?}", &initramfs_entire_file_path));
         if !rootfs_exists {
             // check if agent binary exists
             let agent_file_name = curr_dir.as_mut_os_string();
             agent_file_name.push("/target/x86_64-unknown-linux-musl/release/agent");
 
             // if agent hasn't been build, build it
-            let agent_exists = Path::new(&agent_file_name).try_exists().expect(&format!("Could not access file {:?}", &agent_file_name));
+            let agent_exists = Path::new(&agent_file_name).try_exists().unwrap_or_else(|_| panic!("Could not access folder {:?}", &agent_file_name));
             if !agent_exists {
                 //build agent
                 info!("Building agent binary");
@@ -146,7 +146,7 @@ impl VmmServiceTrait for VmmService {
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
         // Configure the VMM parameters might need to be calculated rather than hardcoded
-        vmm.configure(2, 4000, kernel_path, &Some(initramfs_path))
+        vmm.configure(1, 4000, kernel_path, &Some(initramfs_path))
             .map_err(VmmErrors::VmmConfigure)?;
 
         // Run the VMM in a separate task
