@@ -6,7 +6,11 @@ use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::time::Duration;
 use std::{
-    convert::From, env::current_dir, net::Ipv4Addr, path::{Path, PathBuf}, process::{Command, Stdio}
+    convert::From,
+    env::current_dir,
+    net::Ipv4Addr,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -50,16 +54,21 @@ impl VmmServiceTrait for VmmService {
         const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
         // get current directory
-        let mut curr_dir = current_dir().expect("Need to be able to access current directory path.");
+        let mut curr_dir =
+            current_dir().expect("Need to be able to access current directory path.");
 
         // define kernel path
         let mut kernel_entire_path = curr_dir.as_os_str().to_owned();
-        kernel_entire_path.push("/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
+        kernel_entire_path
+            .push("/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
 
         // Check if the kernel is on the system, else build it
-        let kernel_exists = Path::new(&kernel_entire_path).try_exists().unwrap_or_else(|_| panic!("Could not access folder {:?}", &kernel_entire_path));
-        if !kernel_exists
-        {
+        let kernel_exists = Path::new(&kernel_entire_path).try_exists().expect(&format!(
+            "Could not access folder {:?}",
+            &kernel_entire_path
+        ));
+
+        if !kernel_exists {
             info!("Kernel not found, building kernel");
             // Execute the script using sh and capture output and error streams
             let output = Command::new("sh")
@@ -74,7 +83,7 @@ impl VmmServiceTrait for VmmService {
             error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
         };
         let kernel_path = Path::new(&kernel_entire_path);
-        
+
         // define initramfs file placement
         let mut initramfs_entire_file_path = curr_dir.as_os_str().to_owned();
         initramfs_entire_file_path.push("/tools/rootfs/");
@@ -84,29 +93,35 @@ impl VmmServiceTrait for VmmService {
         let language: Language = Language::from_i32(req.language).expect("Unknown language");
 
         let image = match language {
-            Language::Rust    => {
+            Language::Rust => {
                 initramfs_entire_file_path.push("rust.img");
                 "rust:alpine"
-            },
-            Language::Python  => {
+            }
+            Language::Python => {
                 initramfs_entire_file_path.push("python.img");
                 "python:alpine"
-            },
-            Language::Node    => {
+            }
+            Language::Node => {
                 initramfs_entire_file_path.push("node.img");
                 "node:alpine"
-            },
+            }
         };
 
-
-        let rootfs_exists = Path::new(&initramfs_entire_file_path).try_exists().unwrap_or_else(|_| panic!("Could not access folder {:?}", &initramfs_entire_file_path));
+        let rootfs_exists = Path::new(&initramfs_entire_file_path)
+            .try_exists()
+            .expect(&format!(
+                "Could not access folder {:?}",
+                &initramfs_entire_file_path
+            ));
         if !rootfs_exists {
             // check if agent binary exists
             let agent_file_name = curr_dir.as_mut_os_string();
             agent_file_name.push("/target/x86_64-unknown-linux-musl/release/agent");
 
             // if agent hasn't been build, build it
-            let agent_exists = Path::new(&agent_file_name).try_exists().unwrap_or_else(|_| panic!("Could not access folder {:?}", &agent_file_name));
+            let agent_exists = Path::new(&agent_file_name)
+                .try_exists()
+                .expect(&format!("Could not access folder {:?}", &agent_file_name));
             if !agent_exists {
                 //build agent
                 info!("Building agent binary");
@@ -117,7 +132,7 @@ impl VmmServiceTrait for VmmService {
                     .stderr(Stdio::piped())
                     .output()
                     .expect("Failed to execute the just build script for the agent");
-    
+
                 // Print output and error streams
                 info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
                 error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
