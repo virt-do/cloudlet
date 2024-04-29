@@ -52,15 +52,16 @@ impl RustAgent {
     }
 }
 
-// TODO should change with a TryFrom
-impl From<workload::config::Config> for RustAgent {
-    fn from(workload_config: workload::config::Config) -> Self {
-        let rust_config: RustAgentConfig = toml::from_str(&workload_config.config_string).unwrap();
+impl TryFrom<workload::config::Config> for RustAgent {
+    type Error = Box<dyn std::error::Error>;
 
-        Self {
+    fn try_from(workload_config: workload::config::Config) -> Result<Self, Self::Error> {
+        let rust_config: RustAgentConfig = toml::from_str(&workload_config.config_string)?;
+
+        Ok(Self {
             workload_config,
             rust_config,
-        }
+        })
     }
 }
 
