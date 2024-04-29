@@ -38,9 +38,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_max_level(cli_args.convert_log_to_tracing())
                 .init();
             // Create a new VMM
-            let mut vmm = VMM::new(cli_args.network_host_ip, cli_args.network_host_netmask)
-                .map_err(VmmErrors::VmmNew)
-                .unwrap();
+            let mut vmm = VMM::new(
+                cli_args.iface_host_addr,
+                cli_args.netmask,
+                cli_args.iface_guest_addr,
+            )
+            .map_err(VmmErrors::VmmNew)
+            .unwrap();
 
             vmm.configure(
                 cli_args.cpus,

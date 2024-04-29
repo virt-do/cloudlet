@@ -42,11 +42,15 @@ pub struct CliArguments {
 
     /// IPv4 address of the host tap interface.
     #[clap(long, env, required = true)]
-    pub network_host_ip: Ipv4Addr,
+    pub iface_host_addr: Ipv4Addr,
 
-    /// Subnet mask of the host tap interface.
+    /// Subnet mask for network.
     #[clap(long, env, required = true)]
-    pub network_host_netmask: Ipv4Addr,
+    pub netmask: Ipv4Addr,
+
+    /// IPv4 address of the guest eth0 interface.
+    #[clap(long, env, required = true)]
+    pub iface_guest_addr: Ipv4Addr,
 
     /// Verbosity level.
     #[command(flatten)]

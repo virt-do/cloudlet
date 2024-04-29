@@ -41,6 +41,7 @@ impl VmmServiceTrait for VmmService {
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
+        const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
         // Check if the kernel is on the system, else build it
         if !Path::new("./tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin")
@@ -69,7 +70,7 @@ impl VmmServiceTrait for VmmService {
         initramfs_path.push("./tools/rootfs/initramfs.img");
 
         // // Create a new VMM
-        let mut vmm = VMM::new(HOST_IP, HOST_NETMASK).map_err(VmmErrors::VmmNew)?;
+        let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
         // Configure the VMM parameters might need to be calculated rather than hardcoded
         vmm.configure(1, 512, kernel_path, &Some(initramfs_path))

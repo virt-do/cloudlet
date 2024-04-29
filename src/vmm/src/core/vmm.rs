@@ -58,8 +58,9 @@ pub struct VMM {
     event_mgr: EventMgr,
     vcpus: Vec<Vcpu>,
 
-    tap_ip_addr: Ipv4Addr,
-    tap_netmask: Ipv4Addr,
+    tap_addr: Ipv4Addr,
+    netmask: Ipv4Addr,
+    iface_guest_addr: Ipv4Addr,
     net_devices: Vec<Arc<Mutex<Net>>>,
     serial: Arc<Mutex<LumperSerial<Stdout>>>,
     slip_pty: Arc<Mutex<SlipPty>>,
@@ -68,7 +69,7 @@ pub struct VMM {
 
 impl VMM {
     /// Create a new VMM.
-    pub fn new(tap_ip_addr: Ipv4Addr, tap_netmask: Ipv4Addr) -> Result<Self> {
+    pub fn new(tap_addr: Ipv4Addr, netmask: Ipv4Addr, iface_guest_addr: Ipv4Addr) -> Result<Self> {
         // Open /dev/kvm and get a file descriptor to it.
         let kvm = Kvm::new().map_err(Error::KvmIoctl)?;
 
@@ -110,8 +111,9 @@ impl VMM {
             )),
             slip_pty: Arc::new(Mutex::new(slip_pty)),
             epoll,
-            tap_ip_addr,
-            tap_netmask,
+            tap_addr,
+            netmask,
+            iface_guest_addr,
             net_devices: Vec::new(),
         };
 
@@ -381,8 +383,9 @@ impl VMM {
             mem,
             self.device_mgr.clone(),
             mmio_cfg,
-            self.tap_ip_addr,
-            self.tap_netmask,
+            self.tap_addr,
+            self.netmask,
+            self.iface_guest_addr,
             irq,
             self.event_mgr.lock().unwrap().remote_endpoint(),
             self.vm_fd.clone(),
