@@ -7,24 +7,24 @@ use std::{error::Error, path::PathBuf};
 #[derive(Deserialize)]
 struct TomlConfig {
     #[serde(rename = "workload-name")]
-    workload_name: String,
+    _workload_name: String,
     language: Language,
-    action: String,
-    server: ServerConfig,
+    _action: String,
+    _server: ServerConfig,
     build: BuildConfig,
 }
 
 #[derive(Deserialize)]
 struct ServerConfig {
-    address: String,
-    port: u16,
+    _address: String,
+    _port: u16,
 }
 
 #[derive(Deserialize)]
 struct BuildConfig {
     #[serde(rename = "source-code-path")]
     source_code_path: PathBuf,
-    release: bool,
+    _release: bool,
 }
 
 pub struct CloudletClient {}
