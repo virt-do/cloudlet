@@ -6,11 +6,7 @@ use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::time::Duration;
 use std::{
-    convert::From,
-    env::current_dir,
-    net::Ipv4Addr,
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
+    convert::From, env::current_dir, net::Ipv4Addr, path::{Path, PathBuf}, process::{Command, Stdio}
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -54,7 +50,7 @@ impl VmmServiceTrait for VmmService {
         const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
         // get current directory
-        let mut curr_dir = current_dir()?;
+        let mut curr_dir = current_dir().expect("Need to be able to access current directory path.");
 
         // define kernel path
         let mut kernel_entire_path = curr_dir.as_os_str().to_owned();
@@ -80,7 +76,7 @@ impl VmmServiceTrait for VmmService {
         let kernel_path = Path::new(&kernel_entire_path);
         
         // define initramfs file placement
-        let initramfs_entire_file_path = curr_dir.as_mut_os_string();
+        let mut initramfs_entire_file_path = curr_dir.as_os_str().to_owned();
         initramfs_entire_file_path.push("/tools/rootfs/");
 
         // get request with the language
@@ -101,16 +97,39 @@ impl VmmServiceTrait for VmmService {
                 "node:alpine"
             },
         };
-        
-        // Check if the initramfs is on the system, else build it
-        let initramfs_exists = Path::new(&initramfs_entire_file_path).try_exists().expect(&format!("Could not access folder {:?}", &initramfs_entire_file_path));
-        if !initramfs_exists
-        {
-            info!("Initramfs not found, building initramfs");
+
+
+        let rootfs_exists = Path::new(&initramfs_entire_file_path).try_exists().expect(&format!("Could not access file {:?}", &initramfs_entire_file_path));
+        if !rootfs_exists {
+            // check if agent binary exists
+            let agent_file_name = curr_dir.as_mut_os_string();
+            agent_file_name.push("/target/x86_64-unknown-linux-musl/release/agent");
+
+            // if agent hasn't been build, build it
+            let agent_exists = Path::new(&agent_file_name).try_exists().expect(&format!("Could not access file {:?}", &agent_file_name));
+            if !agent_exists {
+                //build agent
+                info!("Building agent binary");
+                // Execute the script using sh and capture output and error streams
+                let output = Command::new("just")
+                    .arg("build-musl-agent")
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .output()
+                    .expect("Failed to execute the just build script for the agent");
+    
+                // Print output and error streams
+                info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
+                error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
+                info!("Agent binary successfully built.")
+            }
+
+            info!("Building initramfs");
             // Execute the script using sh and capture output and error streams
             let output = Command::new("sh")
                 .arg("./tools/rootfs/mkrootfs.sh")
                 .arg(image)
+                .arg(&agent_file_name)
                 .arg(&initramfs_entire_file_path)
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -120,7 +139,8 @@ impl VmmServiceTrait for VmmService {
             // Print output and error streams
             info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
             error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
-        };
+            info!("Initramfs successfully built.")
+        }
         let initramfs_path = PathBuf::from(&initramfs_entire_file_path);
 
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;

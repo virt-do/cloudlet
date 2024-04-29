@@ -29,6 +29,11 @@ build-agent args = "":
     -w /volume \
     -t clux/muslrust \
     cargo build --release --bin agent {{args}}
+  
+build-musl-agent args = "":
+  #!/bin/bash
+  rustup target add x86_64-unknown-linux-musl
+  cargo build --release --bin agent --target=x86_64-unknown-linux-musl
 
 build-rootfs mode = "dev":
   #!/bin/bash

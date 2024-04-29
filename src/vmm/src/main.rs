@@ -1,7 +1,7 @@
 use crate::args::{CliArgs, Commands};
 use clap::Parser;
 use tonic::transport::Server;
-use tracing::{info, level_filters::LevelFilter};
+use tracing::info;
 use vmm::{
     core::vmm::VMM,
     grpc::server::{vmmorchestrator, VmmService},
