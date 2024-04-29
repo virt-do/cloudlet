@@ -2,6 +2,7 @@ use std::{
     fs::File,
     io::Read,
     os::fd::{AsRawFd, RawFd},
+    process::Command,
     sync::Arc,
 };
 
@@ -22,6 +23,9 @@ impl SlipPty {
             openpty::openpty(None, None, None).map_err(|_| Error::PtyCreation)?;
         info!(?name, "Opened PTY for SLIP");
 
+        // we need to extract the pts number from the name
+        let pts_num = name.split("/dev/pts/").collect::<Vec<&str>>()[1];
+
         // Disable echo in the master end
         let mut termios = termios::tcgetattr(&master).map_err(|_| Error::PtySetup)?;
         termios.local_flags.remove(termios::LocalFlags::ECHO);
@@ -31,6 +35,36 @@ impl SlipPty {
         // Create a new Serial device around this PTY
         let master = Arc::new(master);
         let serial = LumperSerial::new(master.clone()).map_err(Error::SerialCreation)?;
+
+        //
+        info!("Setting up IP address");
+        // Replace `{{pts_num}}` with the actual pts_num value
+
+        // Set up the IP address
+        Command::new("slattach")
+            .arg("-L")
+            .arg(format!("/dev/pts/{}", pts_num))
+            .spawn()
+            .expect("Failed to execute slattach");
+
+        // Add IP address to the interface
+        Command::new("ip")
+            .arg("a")
+            .arg("add")
+            .arg("172.30.0.10/16")
+            .arg("dev")
+            .arg("sl0")
+            .spawn()
+            .expect("Failed to execute ip a add");
+
+        // Set the interface up
+        Command::new("ip")
+            .arg("l")
+            .arg("set")
+            .arg("sl0")
+            .arg("up")
+            .spawn()
+            .expect("Failed to execute ip l set up");
 
         Ok(Self {
             serial,

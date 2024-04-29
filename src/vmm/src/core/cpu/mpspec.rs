@@ -69,7 +69,7 @@ fn bindgen_test_layout_mpf_intel() {
         concat!("Alignment of ", stringify!(mpf_intel))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).signature as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).signature as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -79,7 +79,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).physptr as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).physptr as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -89,7 +89,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).length as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).length as *const _ as usize },
         8usize,
         concat!(
             "Alignment of field: ",
@@ -99,7 +99,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).specification as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).specification as *const _ as usize },
         9usize,
         concat!(
             "Alignment of field: ",
@@ -109,7 +109,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).checksum as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).checksum as *const _ as usize },
         10usize,
         concat!(
             "Alignment of field: ",
@@ -119,7 +119,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).feature1 as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).feature1 as *const _ as usize },
         11usize,
         concat!(
             "Alignment of field: ",
@@ -129,7 +129,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).feature2 as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).feature2 as *const _ as usize },
         12usize,
         concat!(
             "Alignment of field: ",
@@ -139,7 +139,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).feature3 as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).feature3 as *const _ as usize },
         13usize,
         concat!(
             "Alignment of field: ",
@@ -149,7 +149,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).feature4 as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).feature4 as *const _ as usize },
         14usize,
         concat!(
             "Alignment of field: ",
@@ -159,7 +159,7 @@ fn bindgen_test_layout_mpf_intel() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpf_intel)).feature5 as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpf_intel>()).feature5 as *const _ as usize },
         15usize,
         concat!(
             "Alignment of field: ",
@@ -202,7 +202,7 @@ fn bindgen_test_layout_mpc_table() {
         concat!("Alignment of ", stringify!(mpc_table))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).signature as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).signature as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -212,7 +212,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).length as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).length as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -222,7 +222,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).spec as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).spec as *const _ as usize },
         6usize,
         concat!(
             "Alignment of field: ",
@@ -232,7 +232,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).checksum as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).checksum as *const _ as usize },
         7usize,
         concat!(
             "Alignment of field: ",
@@ -242,7 +242,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).oem as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).oem as *const _ as usize },
         8usize,
         concat!(
             "Alignment of field: ",
@@ -252,7 +252,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).productid as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).productid as *const _ as usize },
         16usize,
         concat!(
             "Alignment of field: ",
@@ -262,7 +262,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).oemptr as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).oemptr as *const _ as usize },
         28usize,
         concat!(
             "Alignment of field: ",
@@ -272,7 +272,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).oemsize as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).oemsize as *const _ as usize },
         32usize,
         concat!(
             "Alignment of field: ",
@@ -282,7 +282,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).oemcount as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).oemcount as *const _ as usize },
         34usize,
         concat!(
             "Alignment of field: ",
@@ -292,7 +292,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).lapic as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).lapic as *const _ as usize },
         36usize,
         concat!(
             "Alignment of field: ",
@@ -302,7 +302,7 @@ fn bindgen_test_layout_mpc_table() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_table)).reserved as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_table>()).reserved as *const _ as usize },
         40usize,
         concat!(
             "Alignment of field: ",
@@ -341,7 +341,7 @@ fn bindgen_test_layout_mpc_cpu() {
         concat!("Alignment of ", stringify!(mpc_cpu))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).type_ as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).type_ as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -351,7 +351,7 @@ fn bindgen_test_layout_mpc_cpu() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).apicid as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).apicid as *const _ as usize },
         1usize,
         concat!(
             "Alignment of field: ",
@@ -361,7 +361,7 @@ fn bindgen_test_layout_mpc_cpu() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).apicver as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).apicver as *const _ as usize },
         2usize,
         concat!(
             "Alignment of field: ",
@@ -371,7 +371,7 @@ fn bindgen_test_layout_mpc_cpu() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).cpuflag as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).cpuflag as *const _ as usize },
         3usize,
         concat!(
             "Alignment of field: ",
@@ -381,7 +381,7 @@ fn bindgen_test_layout_mpc_cpu() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).cpufeature as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).cpufeature as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -391,7 +391,7 @@ fn bindgen_test_layout_mpc_cpu() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).featureflag as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).featureflag as *const _ as usize },
         8usize,
         concat!(
             "Alignment of field: ",
@@ -401,7 +401,7 @@ fn bindgen_test_layout_mpc_cpu() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_cpu)).reserved as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_cpu>()).reserved as *const _ as usize },
         12usize,
         concat!(
             "Alignment of field: ",
@@ -436,7 +436,7 @@ fn bindgen_test_layout_mpc_bus() {
         concat!("Alignment of ", stringify!(mpc_bus))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_bus)).type_ as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_bus>()).type_ as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -446,7 +446,7 @@ fn bindgen_test_layout_mpc_bus() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_bus)).busid as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_bus>()).busid as *const _ as usize },
         1usize,
         concat!(
             "Alignment of field: ",
@@ -456,7 +456,7 @@ fn bindgen_test_layout_mpc_bus() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_bus)).bustype as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_bus>()).bustype as *const _ as usize },
         2usize,
         concat!(
             "Alignment of field: ",
@@ -493,7 +493,7 @@ fn bindgen_test_layout_mpc_ioapic() {
         concat!("Alignment of ", stringify!(mpc_ioapic))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_ioapic)).type_ as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_ioapic>()).type_ as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -503,7 +503,7 @@ fn bindgen_test_layout_mpc_ioapic() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_ioapic)).apicid as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_ioapic>()).apicid as *const _ as usize },
         1usize,
         concat!(
             "Alignment of field: ",
@@ -513,7 +513,7 @@ fn bindgen_test_layout_mpc_ioapic() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_ioapic)).apicver as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_ioapic>()).apicver as *const _ as usize },
         2usize,
         concat!(
             "Alignment of field: ",
@@ -523,7 +523,7 @@ fn bindgen_test_layout_mpc_ioapic() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_ioapic)).flags as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_ioapic>()).flags as *const _ as usize },
         3usize,
         concat!(
             "Alignment of field: ",
@@ -533,7 +533,7 @@ fn bindgen_test_layout_mpc_ioapic() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_ioapic)).apicaddr as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_ioapic>()).apicaddr as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -572,7 +572,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         concat!("Alignment of ", stringify!(mpc_intsrc))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).type_ as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).type_ as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -582,7 +582,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).irqtype as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).irqtype as *const _ as usize },
         1usize,
         concat!(
             "Alignment of field: ",
@@ -592,7 +592,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).irqflag as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).irqflag as *const _ as usize },
         2usize,
         concat!(
             "Alignment of field: ",
@@ -602,7 +602,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).srcbus as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).srcbus as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -612,7 +612,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).srcbusirq as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).srcbusirq as *const _ as usize },
         5usize,
         concat!(
             "Alignment of field: ",
@@ -622,7 +622,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).dstapic as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).dstapic as *const _ as usize },
         6usize,
         concat!(
             "Alignment of field: ",
@@ -632,7 +632,7 @@ fn bindgen_test_layout_mpc_intsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_intsrc)).dstirq as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_intsrc>()).dstirq as *const _ as usize },
         7usize,
         concat!(
             "Alignment of field: ",
@@ -676,7 +676,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         concat!("Alignment of ", stringify!(mpc_lintsrc))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).type_ as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).type_ as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -686,7 +686,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).irqtype as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).irqtype as *const _ as usize },
         1usize,
         concat!(
             "Alignment of field: ",
@@ -696,7 +696,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).irqflag as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).irqflag as *const _ as usize },
         2usize,
         concat!(
             "Alignment of field: ",
@@ -706,7 +706,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).srcbusid as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).srcbusid as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -716,7 +716,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).srcbusirq as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).srcbusirq as *const _ as usize },
         5usize,
         concat!(
             "Alignment of field: ",
@@ -726,7 +726,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).destapic as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).destapic as *const _ as usize },
         6usize,
         concat!(
             "Alignment of field: ",
@@ -736,7 +736,7 @@ fn bindgen_test_layout_mpc_lintsrc() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_lintsrc)).destapiclint as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_lintsrc>()).destapiclint as *const _ as usize },
         7usize,
         concat!(
             "Alignment of field: ",
@@ -773,7 +773,7 @@ fn bindgen_test_layout_mpc_oemtable() {
         concat!("Alignment of ", stringify!(mpc_oemtable))
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_oemtable)).signature as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_oemtable>()).signature as *const _ as usize },
         0usize,
         concat!(
             "Alignment of field: ",
@@ -783,7 +783,7 @@ fn bindgen_test_layout_mpc_oemtable() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_oemtable)).length as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_oemtable>()).length as *const _ as usize },
         4usize,
         concat!(
             "Alignment of field: ",
@@ -793,7 +793,7 @@ fn bindgen_test_layout_mpc_oemtable() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_oemtable)).rev as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_oemtable>()).rev as *const _ as usize },
         6usize,
         concat!(
             "Alignment of field: ",
@@ -803,7 +803,7 @@ fn bindgen_test_layout_mpc_oemtable() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_oemtable)).checksum as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_oemtable>()).checksum as *const _ as usize },
         7usize,
         concat!(
             "Alignment of field: ",
@@ -813,7 +813,7 @@ fn bindgen_test_layout_mpc_oemtable() {
         )
     );
     assert_eq!(
-        unsafe { &(*(0 as *const mpc_oemtable)).mpc as *const _ as usize },
+        unsafe { &(*std::ptr::null::<mpc_oemtable>()).mpc as *const _ as usize },
         8usize,
         concat!(
             "Alignment of field: ",

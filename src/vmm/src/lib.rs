@@ -1,5 +1,8 @@
 pub mod core;
-pub mod service;
+pub mod grpc {
+    pub mod client;
+    pub mod server;
+}
 
 #[derive(Debug)]
 pub enum VmmErrors {
