@@ -18,9 +18,9 @@ pub fn register_mmio_device(
     // !TODO Register to MmioManager
     device_mgr
         .lock()
-        .unwrap()
+        .map_err(|_| Error::Mutex)?
         .register_mmio(mmio_cfg.range, device)
-        .unwrap();
+        .map_err(Error::RegisterMmioDevice)?;
 
     let size = mmio_cfg.range.size();
 

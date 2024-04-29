@@ -1,4 +1,4 @@
-pub(crate) mod net;
+pub mod net;
 mod register;
 
 use event_manager::{
@@ -6,7 +6,6 @@ use event_manager::{
 };
 use kvm_ioctls::{IoEventAddress, VmFd};
 use libc::EFD_NONBLOCK;
-use log::info;
 use std::{
     io,
     sync::{
@@ -16,14 +15,13 @@ use std::{
 };
 use virtio_device::VirtioConfig;
 use virtio_queue::{Queue, QueueT};
-use vm_device::bus::{self, MmioAddress, MmioRange};
+use vm_device::bus::{self, MmioRange};
 use vmm_sys_util::{errno, eventfd::EventFd};
 
 // Device-independent virtio features.
 mod features {
     pub const VIRTIO_F_RING_EVENT_IDX: u64 = 29;
     pub const VIRTIO_F_VERSION_1: u64 = 32;
-    pub const VIRTIO_F_IN_ORDER: u64 = 35;
 }
 
 // This bit is set on the device interrupt status when notifying the driver about used
@@ -40,6 +38,7 @@ const VIRTIO_MMIO_QUEUE_NOTIFY_OFFSET: u64 = 0x50;
 const QUEUE_MAX_SIZE: u16 = 256;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Error {
     AlreadyActivated,
     BadFeatures(u64),
@@ -48,9 +47,14 @@ pub enum Error {
     Endpoint(EvmgrError),
     EventFd(io::Error),
     Overflow,
+    IoEvent,
     QueuesNotValid,
     RegisterIoevent(errno::Error),
     RegisterIrqfd(errno::Error),
+    RegisterMmioDevice(bus::Error),
+    Conversion,
+    Mutex,
+    Net,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -61,24 +65,6 @@ pub struct MmioConfig {
     pub range: MmioRange,
     // The interrupt assigned to the device.
     pub gsi: u32,
-}
-
-impl MmioConfig {
-    pub fn new(base: u64, size: u64, gsi: u32) -> Result<Self> {
-        MmioRange::new(MmioAddress(base), size)
-            .map(|range| MmioConfig { range, gsi })
-            .map_err(Error::Bus)
-    }
-
-    pub fn next(&self) -> Result<Self> {
-        let range = self.range;
-        let next_start = range
-            .base()
-            .0
-            .checked_add(range.size())
-            .ok_or(Error::Overflow)?;
-        Self::new(next_start, range.size(), self.gsi + 1)
-    }
 }
 
 pub struct Config {
@@ -145,7 +131,7 @@ impl Config {
                     ),
                     // The maximum number of queues should fit within an `u16` according to the
                     // standard, so the conversion below is always expected to succeed.
-                    u32::try_from(i).unwrap(),
+                    u32::try_from(i).map_err(|_| Error::Conversion)?,
                 )
                 .map_err(Error::RegisterIoevent)?;
 

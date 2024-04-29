@@ -22,6 +22,7 @@ log = "0.4.20"
 nix = { version = "0.28.0", features = ["term"] }
 openpty = "0.2.0"
 prost = "0.11"
+tokio = { version = "1.37.0", features = ["full"] }
 tonic = "0.9"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
@@ -33,7 +34,6 @@ vm-device = "0.1.0"
 vm-memory = { version = "0.14.1", features = ["backend-mmap"] }
 vm-superio = "0.7.0"
 vmm-sys-util = "0.12.1"
-tokio = { version = "1.37.0", features = ["full"] }
 
 [build-dependencies]
 tonic-build = "0.9"

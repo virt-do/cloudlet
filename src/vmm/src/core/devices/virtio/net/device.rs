@@ -1,15 +1,15 @@
 use super::queue_handler::QueueHandler;
-use super::Result;
 use super::{
-    simple_handler::SimpleHandler, tuntap::tap::Tap, Error, NET_DEVICE_ID, VIRTIO_NET_HDR_SIZE,
+    simple_handler::SimpleHandler, tuntap::tap::Tap, Error, Result, NET_DEVICE_ID,
+    VIRTIO_NET_HDR_SIZE,
 };
 use crate::core::devices::virtio::features::VIRTIO_F_RING_EVENT_IDX;
 use crate::core::devices::virtio::net::tuntap::open_tap::open_tap;
 use crate::core::devices::virtio::register::register_mmio_device;
 use crate::core::devices::virtio::{
-    Config, MmioConfig, SingleFdSignalQueue, Subscriber, QUEUE_MAX_SIZE,
+    self, Config, MmioConfig, SingleFdSignalQueue, Subscriber, QUEUE_MAX_SIZE,
 };
-use event_manager::{EventManager, MutEventSubscriber, RemoteEndpoint};
+use event_manager::RemoteEndpoint;
 use kvm_ioctls::VmFd;
 use std::net::Ipv4Addr;
 use std::{
@@ -32,9 +32,7 @@ use vm_memory::GuestMemoryMmap;
 
 pub struct Net {
     mem: Arc<GuestMemoryMmap>,
-    device_mgr: Arc<Mutex<IoManager>>,
     pub config: Config,
-    //tap_name: String,
     tap: Arc<Mutex<Tap>>,
 }
 
@@ -43,7 +41,6 @@ impl Net {
         mem: Arc<GuestMemoryMmap>,
         device_mgr: Arc<Mutex<IoManager>>,
         mmio_cfg: MmioConfig,
-        tap_name: String,
         ip_addr: Ipv4Addr,
         mask: Ipv4Addr,
         irq: u32,
@@ -65,31 +62,32 @@ impl Net {
 
         let config_space = Vec::new();
         let queues = vec![
-            Queue::new(QUEUE_MAX_SIZE).unwrap(),
-            Queue::new(QUEUE_MAX_SIZE).unwrap(),
+            Queue::new(QUEUE_MAX_SIZE).map_err(|_| Error::Virtio(virtio::Error::QueuesNotValid))?,
+            Queue::new(QUEUE_MAX_SIZE).map_err(|_| Error::Virtio(virtio::Error::QueuesNotValid))?,
         ];
+
         let virtio_cfg = VirtioConfig::new(device_features, queues, config_space);
 
-        // let vmmio_parameter = register_mmio_device(size, baseaddr, irq, None).unwrap();
-        let cfg = Config::new(virtio_cfg, mmio_cfg, endpoint, vm_fd).unwrap();
+        let cfg = Config::new(virtio_cfg, mmio_cfg, endpoint, vm_fd).map_err(Error::Virtio)?;
 
         // Set offload flags to match the relevant virtio features of the device (for now,
         // statically set in the constructor.
-        //let tap = Tap::new(1).unwrap();
-        let tap = open_tap(None, Some(ip_addr), Some(mask), &mut None, None, None).unwrap();
+        let tap = open_tap(None, Some(ip_addr), Some(mask), &mut None, None, None)
+            .map_err(Error::TunTap)?;
 
         // The layout of the header is specified in the standard and is 12 bytes in size. We
         // should define this somewhere.
-        tap.set_vnet_hdr_size(VIRTIO_NET_HDR_SIZE as i32).unwrap();
+        tap.set_vnet_hdr_size(VIRTIO_NET_HDR_SIZE as i32)
+            .map_err(Error::Tap)?;
 
         let net = Arc::new(Mutex::new(Net {
-            device_mgr: device_mgr.clone(),
             mem,
             config: cfg,
             tap: Arc::new(Mutex::new(tap)),
         }));
 
-        let param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone()).unwrap();
+        let param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone())
+            .map_err(Error::Virtio)?;
         cmdline_extra_parameters.push(param);
 
         Ok(net)

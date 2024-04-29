@@ -1,15 +1,13 @@
 // Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: Apache-2.0 OR BSD-3-Clause
 
+use super::simple_handler::SimpleHandler;
+use crate::core::devices::virtio::SignalUsedQueue;
 use event_manager::{EventOps, Events, MutEventSubscriber};
-use log::{error, info};
+use log::error;
 use std::os::fd::AsRawFd;
 use vmm_sys_util::epoll::EventSet;
 use vmm_sys_util::eventfd::EventFd;
-
-use crate::core::devices::virtio::SignalUsedQueue;
-
-use super::simple_handler::SimpleHandler;
 
 const TAPFD_DATA: u32 = 0;
 const RX_IOEVENT_DATA: u32 = 1;
@@ -36,8 +34,15 @@ where
             .expect("Failed to remove rx ioevent");
         ops.remove(Events::empty(&self.tx_ioevent))
             .expect("Failed to remove tx ioevent");
-        ops.remove(Events::empty(&self.inner.tap.lock().unwrap().as_raw_fd()))
-            .expect("Failed to remove tap event");
+        ops.remove(Events::empty(
+            &self
+                .inner
+                .tap
+                .lock()
+                .expect("Failed to lock tap resource")
+                .as_raw_fd(),
+        ))
+        .expect("Failed to remove tap event");
     }
 }
 
@@ -81,7 +86,12 @@ where
 
     fn init(&mut self, ops: &mut EventOps) {
         ops.add(Events::with_data(
-            &self.inner.tap.lock().unwrap().as_raw_fd(),
+            &self
+                .inner
+                .tap
+                .lock()
+                .expect("Failed to lock tap resource")
+                .as_raw_fd(),
             TAPFD_DATA,
             EventSet::IN | EventSet::EDGE_TRIGGERED,
         ))

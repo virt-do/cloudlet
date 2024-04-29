@@ -24,7 +24,7 @@ use vm_memory::{Address, GuestAddress, GuestMemory, GuestMemoryMmap, GuestMemory
 use vmm_sys_util::terminal::Terminal;
 
 use super::devices::virtio::net::device::Net;
-use super::devices::virtio::MmioConfig;
+use super::devices::virtio::{self, MmioConfig};
 use super::irq_allocator::IrqAllocator;
 use super::slip_pty::SlipPty;
 
@@ -342,7 +342,7 @@ impl VMM {
 
         self.configure_memory(mem_size_mb)?;
         self.configure_allocators(mem_size_mb)?;
-        self.configure_net_device("tap0".to_string(), cmdline_extra_parameters)?;
+        self.configure_net_device(cmdline_extra_parameters)?;
 
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
@@ -358,7 +358,6 @@ impl VMM {
 
     pub fn configure_net_device(
         &mut self,
-        tap_name: String,
         cmdline_extra_parameters: &mut Vec<String>,
     ) -> Result<()> {
         let mem = Arc::new(self.guest_memory.clone());
@@ -366,26 +365,25 @@ impl VMM {
             allocator
                 .to_owned()
                 .allocate(0x1000, DEFAULT_ADDRESS_ALIGNEMNT, DEFAULT_ALLOC_POLICY)
-                .unwrap()
+                .map_err(Error::Allocate)?
         } else {
             // Handle the case where self.address_allocator is None
             panic!("Address allocator is not initialized");
         };
-        let mmio_range = MmioRange::new(MmioAddress(range.start()), range.len()).unwrap();
-        let irq = self.irq_allocator.next_irq().unwrap();
+        let mmio_range = MmioRange::new(MmioAddress(range.start()), range.len())
+            .map_err(|_| Error::MmioRange)?;
+        let irq = self.irq_allocator.next_irq().map_err(Error::IrqAllocator)?;
         let mmio_cfg = MmioConfig {
             range: mmio_range,
             gsi: irq,
         };
         // let mut guard = self.device_mgr.lock().unwrap();
-        // let vm_fd = Arc::clone(&self.vm_fd);
 
         // !TODO: MMIO Device Discovery + MMIO Device Register Layout
         let net = Net::new(
             mem,
             self.device_mgr.clone(),
             mmio_cfg,
-            tap_name,
             self.tap_ip_addr,
             self.tap_netmask,
             irq,
@@ -393,7 +391,7 @@ impl VMM {
             self.vm_fd.clone(),
             cmdline_extra_parameters,
         )
-        .unwrap();
+        .map_err(|_| Error::Virtio(virtio::Error::Net))?;
 
         self.net_devices.push(net);
 

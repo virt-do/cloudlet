@@ -6,7 +6,7 @@ use std::io::{self, Read, Write};
 use std::result;
 use std::sync::{Arc, Mutex};
 
-use log::{info, warn};
+use log::warn;
 use virtio_queue::{DescriptorChain, Queue, QueueOwnedT, QueueT};
 use vm_memory::{Bytes, GuestAddressSpace, GuestMemoryMmap};
 
@@ -32,6 +32,7 @@ pub enum Error {
     GuestMemory(vm_memory::GuestMemoryError),
     Queue(virtio_queue::Error),
     Tap(io::Error),
+    Mutex,
 }
 
 impl From<virtio_queue::Error> for Error {
@@ -88,7 +89,7 @@ where
     fn write_frame_to_guest(&mut self) -> result::Result<bool, Error> {
         let num_bytes = self.rxbuf_current;
 
-        let mut chain = match self.rxq.iter(self.mem.memory())?.next() {
+        let mut chain = match self.rxq.iter(self.mem.as_ref())?.next() {
             Some(c) => c,
             _ => return Ok(false),
         };
@@ -117,9 +118,8 @@ where
             warn!("rx frame too large");
         }
 
-        let mem_ref = Arc::as_ref(&self.mem);
         self.rxq
-            .add_used(mem_ref, chain.head_index(), count as u32)?;
+            .add_used(self.mem.as_ref(), chain.head_index(), count as u32)?;
 
         self.rxbuf_current = 0;
 
@@ -129,9 +129,14 @@ where
     pub fn process_tap(&mut self) -> result::Result<(), Error> {
         loop {
             if self.rxbuf_current == 0 {
-                match self.tap.lock().unwrap().read(&mut self.rxbuf) {
+                match self
+                    .tap
+                    .lock()
+                    .map_err(|_| Error::Mutex)?
+                    .read(&mut self.rxbuf)
+                {
                     Ok(n) => self.rxbuf_current = n,
-                    Err(e) => {
+                    Err(_) => {
                         // TODO: Do something (logs, metrics, etc.) in response to an error when
                         // reading from tap. EAGAIN means there's nothing available to read anymore
                         // (because we open the TAP as non-blocking).
@@ -177,7 +182,7 @@ where
 
         self.tap
             .lock()
-            .unwrap()
+            .map_err(|_| Error::Mutex)?
             .write_all(&self.txbuf[..count])
             .map_err(Error::Tap)?;
 
