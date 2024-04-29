@@ -34,6 +34,9 @@ pub struct CliArgs {
     #[arg(long = "arch", default_value = "amd64")]
     pub architecture: String,
 
+    #[arg(short = 'r', default_value = "docker")]
+    pub registry: String,
+
     #[arg(short='d', long="debug", action=ArgAction::SetTrue)]
     pub debug: bool,
 }

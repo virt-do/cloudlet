@@ -56,3 +56,11 @@ impl fmt::Display for Image {
         write!(f, "{}/{}:{}", self.repository, self.name, self.tag)
     }
 }
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct Registry {
+    pub name: String,
+    pub auth_link: String,
+    pub auth_service: String,
+    pub api_v2_link: String,
+}
