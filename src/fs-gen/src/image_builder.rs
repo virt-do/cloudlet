@@ -115,8 +115,10 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
             .with_context(|| "Failed to create a new channel".to_string())?,
     };
 
-    let handle = thread::spawn(move || {
-        let _ = server.svc_loop();
+    let handle = thread::spawn(move || -> Result<()> {
+        server
+            .svc_loop()
+            .with_context(|| "Failed to execute the fuse server loop")
     });
 
     debug!("Starting copy...");
@@ -135,7 +137,10 @@ pub fn merge_layer(blob_paths: &[PathBuf], output_folder: &Path, tmp_folder: &Pa
     se.umount()
         .with_context(|| "Failed to unmount the fuse session".to_string())?;
 
-    let _ = handle.join();
+    let server_result = handle.join();
+    if server_result.is_err() || server_result.is_ok_and(|val| val.is_err()) {
+        return Err(anyhow!("Failed to execute the fuse server"));
+    }
 
     info!("Finished merging layers!");
     Ok(())
