@@ -13,6 +13,8 @@ use std::sync::{Arc, Mutex};
 use std::{io, process};
 use std::{result, u64};
 use tracing::{error, info, warn};
+use vm_device::bus::MmioAddress;
+use vm_device::device_manager::{IoManager, MmioManager};
 use vm_memory::{Address, Bytes, GuestAddress, GuestMemoryError, GuestMemoryMmap};
 use vmm_sys_util::terminal::Terminal;
 
@@ -73,6 +75,7 @@ pub(crate) struct Vcpu {
     /// KVM file descriptor for a vCPU.
     pub vcpu_fd: VcpuFd,
 
+    device_mgr: Arc<Mutex<IoManager>>,
     serial: Arc<Mutex<LumperSerial<Stdout>>>,
     slip_pty: Arc<Mutex<SlipPty>>,
 }
@@ -82,12 +85,14 @@ impl Vcpu {
     pub fn new(
         vm_fd: &VmFd,
         index: u64,
+        device_mgr: Arc<Mutex<IoManager>>,
         serial: Arc<Mutex<LumperSerial<Stdout>>>,
         slip_pty: Arc<Mutex<SlipPty>>,
     ) -> Result<Self> {
         Ok(Vcpu {
             index,
             vcpu_fd: vm_fd.create_vcpu(index).map_err(Error::KvmIoctl)?,
+            device_mgr,
             serial,
             slip_pty,
         })
@@ -308,6 +313,28 @@ impl Vcpu {
                         warn!(address = addr, "Unsupported device read at {:x?}", addr);
                     }
                 },
+                VcpuExit::MmioRead(addr, data) => {
+                    if self
+                        .device_mgr
+                        .try_lock()
+                        .unwrap()
+                        .mmio_read(MmioAddress(addr), data)
+                        .is_err()
+                    {
+                        error!("Failed to read from mmio addr={} data={:#?}", addr, data);
+                    }
+                }
+                VcpuExit::MmioWrite(addr, data) => {
+                    if self
+                        .device_mgr
+                        .try_lock()
+                        .unwrap()
+                        .mmio_write(MmioAddress(addr), data)
+                        .is_err()
+                    {
+                        error!("Failed to write to mmio");
+                    }
+                }
                 _ => {
                     error!(?exit_reason, "Unhandled VM-Exit");
                 }

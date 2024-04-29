@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 AND BSD-3-Clause
 
+use super::mac::MacAddr;
+use super::tap::Tap;
 use super::{tap, vnet_hdr_len};
-use crate::core::network::mac::MacAddr;
-use crate::core::network::tap::Tap;
 use std::io;
 use std::net::Ipv4Addr;
 use std::path::Path;
