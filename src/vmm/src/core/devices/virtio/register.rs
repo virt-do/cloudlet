@@ -15,7 +15,6 @@ pub fn register_mmio_device(
     id: Option<u32>,
     device: Arc<dyn DeviceMmio + Send + Sync>,
 ) -> Result<String> {
-    // !TODO Register to MmioManager
     device_mgr
         .lock()
         .map_err(|_| Error::Mutex)?

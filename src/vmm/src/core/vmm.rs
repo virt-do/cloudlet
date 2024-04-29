@@ -279,9 +279,6 @@ impl VMM {
                 Ok(_) => (),
                 Err(e) => eprintln!("Failed to handle events: {:?}", e),
             }
-            // if !self.exit_handler.keep_running() {
-            //     break;
-            // }
         });
 
         // Let's start the STDIN polling thread.
@@ -379,9 +376,7 @@ impl VMM {
             range: mmio_range,
             gsi: irq,
         };
-        // let mut guard = self.device_mgr.lock().unwrap();
 
-        // !TODO: MMIO Device Discovery + MMIO Device Register Layout
         let net = Net::new(
             mem,
             self.device_mgr.clone(),
