@@ -46,6 +46,8 @@ const SERIAL_IRQ: u32 = 4;
 /// Last usable IRQ ID for virtio device interrupts on x86_64.
 const IRQ_MAX: u8 = 23;
 
+type EventMgr = Arc<Mutex<EventManager<Arc<Mutex<dyn MutEventSubscriber + Send>>>>>;
+
 pub struct VMM {
     vm_fd: Arc<VmFd>,
     kvm: Kvm,
@@ -53,7 +55,7 @@ pub struct VMM {
     address_allocator: Option<AddressAllocator>,
     irq_allocator: IrqAllocator,
     device_mgr: Arc<Mutex<IoManager>>,
-    event_mgr: Arc<Mutex<EventManager<Arc<Mutex<dyn MutEventSubscriber + Send>>>>>,
+    event_mgr: EventMgr,
     vcpus: Vec<Vcpu>,
 
     tap_ip_addr: Ipv4Addr,

@@ -7,7 +7,6 @@ use crate::core::devices::serial::{
 };
 use kvm_bindings::{kvm_fpu, kvm_regs, CpuId};
 use kvm_ioctls::{VcpuExit, VcpuFd, VmFd};
-use log::debug;
 use std::convert::TryInto;
 use std::io::Stdout;
 use std::sync::{Arc, Mutex};

@@ -37,6 +37,7 @@ pub struct Net {
 }
 
 impl Net {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         mem: Arc<GuestMemoryMmap>,
         device_mgr: Arc<Mutex<IoManager>>,
