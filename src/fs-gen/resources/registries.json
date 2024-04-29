@@ -1,0 +1,20 @@
+[
+    {
+        "name": "docker",
+        "auth_link": "https://auth.docker.io/token",
+        "auth_service": "registry.docker.io",
+        "api_v2_link": "https://registry-1.docker.io"
+    },
+    {
+        "name": "ghcr",
+        "auth_link": "https://ghcr.io/token",
+        "auth_service": "ghcr.io",
+        "api_v2_link": "https://ghcr.io"
+    },
+    {
+        "name": "gitlab",
+        "auth_link": "https://gitlab.com/jwt/auth",
+        "auth_service": "container_registry",
+        "api_v2_link": "https://registry.gitlab.com"
+    }
+]

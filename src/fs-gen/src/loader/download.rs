@@ -1,6 +1,8 @@
 use crate::loader::errors::ImageLoaderError;
-use crate::loader::structs::{Layer, ManifestV2};
-use crate::loader::utils::{get_docker_download_token, split_image_name, unpack_tarball};
+use crate::loader::structs::{Layer, ManifestV2, Registry};
+use crate::loader::utils::{
+    get_docker_download_token, get_registry, split_image_name, unpack_tarball,
+};
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
 use std::fs::create_dir_all;
@@ -13,15 +15,16 @@ pub(crate) fn download_image_fs(
     image_name: &str,
     architecture: &str,
     output_file: PathBuf,
+    registry_name: &str,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
-
+    let registry = get_registry(registry_name)?;
     let image = split_image_name(image_name);
 
     // Get download token and download manifest
     let client = Client::new();
-    let token = &get_docker_download_token(&client, &image)?;
-    let manifest = download_manifest(&client, token, &image, &image.tag)
+    let token = &get_docker_download_token(&client, &image, &registry)?;
+    let manifest = download_manifest(&client, token, &image, &image.tag, &registry)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
 
     if let ManifestV2::ImageManifest(m) = manifest {
@@ -33,7 +36,7 @@ pub(crate) fn download_image_fs(
         );
         create_dir_all(&output_file)
             .with_context(|| "Could not create output directory for image downloading")?;
-        return download_layers(&m.layers, &client, token, &image, &output_file)
+        return download_layers(&m.layers, &client, token, &image, &output_file, &registry)
             .map_err(|e| ImageLoaderError::Error { source: e });
     }
 
@@ -62,7 +65,7 @@ pub(crate) fn download_image_fs(
         Some(m) => {
             debug!("Downloading architecture-specific manifest");
 
-            download_manifest(&client, token, &image, &m.digest)
+            download_manifest(&client, token, &image, &m.digest, &registry)
                 .map_err(|e| ImageLoaderError::Error { source: e })?
         }
     };
@@ -72,7 +75,7 @@ pub(crate) fn download_image_fs(
         ManifestV2::ImageManifest(m) => {
             create_dir_all(&output_file)
                 .with_context(|| "Could not create output directory for image downloading")?;
-            download_layers(&m.layers, &client, token, &image, &output_file)
+            download_layers(&m.layers, &client, token, &image, &output_file, &registry)
                 .map_err(|e| ImageLoaderError::Error { source: e })
         }
         _ => Err(ImageLoaderError::ImageManifestNotFound(image.clone()))?,
@@ -84,11 +87,12 @@ fn download_manifest(
     token: &str,
     image: &Image,
     digest: &str,
+    registry: &Registry,
 ) -> Result<ManifestV2> {
     // Query Docker Hub API to get the image manifest
     let manifest_url = format!(
-        "https://registry-1.docker.io/v2/{}/{}/manifests/{}",
-        image.repository, image.name, digest
+        "{}/v2/{}/{}/manifests/{}",
+        registry.api_v2_link, image.repository, image.name, digest
     );
 
     let manifest: ManifestV2 = client
@@ -102,6 +106,7 @@ fn download_manifest(
             "application/vnd.docker.distribution.manifest.list.v2+json",
         )
         .header("Accept", "application/vnd.oci.image.manifest.v1+json")
+        .header("Accept", "application/vnd.oci.image.index.v1+json")
         .bearer_auth(token)
         .send()
         .with_context(|| "Could not send request to get manifest data".to_string())?
@@ -122,6 +127,7 @@ fn download_layers(
     token: &str,
     image: &Image,
     output_dir: &Path,
+    registry: &Registry,
 ) -> Result<Vec<PathBuf>> {
     info!("Downloading and unpacking layers...");
 
@@ -131,8 +137,8 @@ fn download_layers(
     for layer in layers {
         let digest = &layer.digest;
         let layer_url = format!(
-            "https://registry-1.docker.io/v2/{}/{}/blobs/{}",
-            image.repository, image.name, digest
+            "{}/v2/{}/{}/blobs/{}",
+            registry.api_v2_link, image.repository, image.name, digest
         );
 
         let response = client
