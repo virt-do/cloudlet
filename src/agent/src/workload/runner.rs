@@ -19,7 +19,7 @@ pub struct Runner {
 impl Runner {
     pub fn new(config: Config) -> Self {
         let agent: Box<dyn Agent + Sync + Send> = match config.language {
-            Language::Rust => Box::new(rust::RustAgent::try_from(config.clone()).unwrap()),
+            Language::Rust => Box::new(rust::RustAgent::try_from(config.clone()).expect("Failed to convert Config to RustAgent")),
             #[cfg(feature = "debug-agent")]
             Language::Debug => Box::new(debug::DebugAgent::from(config.clone())),
         };
