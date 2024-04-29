@@ -7,8 +7,8 @@ use actix_web_lab::sse;
 use async_stream::stream;
 use serde::Serialize;
 use shared_models::CloudletDtoRequest;
-use tokio_stream::{StreamExt};
-use tonic::{Streaming};
+use tokio_stream::StreamExt;
+use tonic::Streaming;
 
 #[post("/run")]
 pub async fn run(req_body: web::Json<CloudletDtoRequest>) -> impl Responder {

@@ -12,10 +12,10 @@ pub struct WorkloadClient {
 }
 
 impl WorkloadClient {
-    pub async fn new(_ip: Ipv4Addr, _port: u16) -> Result<Self, tonic::transport::Error> {
+    pub async fn new(ip: Ipv4Addr, port: u16) -> Result<Self, tonic::transport::Error> {
         let delay = Duration::from_secs(2); // Setting initial delay to 2 seconds
         loop {
-            match WorkloadRunnerClient::connect("http://[172.30.0.11]:50051".to_string()).await {
+            match WorkloadRunnerClient::connect(format!("http://[{}]:{}", ip, port)).await {
                 Ok(client) => {
                     return Ok(WorkloadClient { client });
                 }

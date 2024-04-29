@@ -47,7 +47,7 @@ impl VmmServiceTrait for VmmService {
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
-        const VM_IP: Ipv4Addr = Ipv4Addr::new(172, 30, 0, 11);
+        const VM_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
 
         // Check if the kernel is on the system, else build it
@@ -93,11 +93,8 @@ impl VmmServiceTrait for VmmService {
 
         let grpc_client = tokio::spawn(async move {
             // Wait 2 seconds
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            info!("Connecting to Agent service");
-
-            // Set up the IP address
-            
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            println!("Connecting to Agent service");
 
             WorkloadClient::new(VM_IP, 50051).await
         })
@@ -105,7 +102,6 @@ impl VmmServiceTrait for VmmService {
         .unwrap();
 
         // Send the grpc request to start the agent
-
         let execute_request = ExecuteRequest {};
 
         match grpc_client {
