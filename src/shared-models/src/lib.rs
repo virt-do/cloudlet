@@ -28,6 +28,12 @@ pub struct YamlClientConfigFile {
     pub log_level: LogLevel,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct YamlApiConfigFile {
+    pub bind_ip: String,
+    pub bind_port: u16,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CloudletDtoRequest {
     pub language: Language,
