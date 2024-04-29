@@ -8,13 +8,13 @@ extern crate vm_superio;
 use linux_loader::loader;
 use std::io;
 
-use self::network::open_tap;
+use self::devices::virtio::{self, net::tuntap::open_tap};
 
 mod cpu;
 mod devices;
 mod epoll_context;
+mod irq_allocator;
 mod kernel;
-mod network;
 mod slip_pty;
 pub mod vmm;
 
@@ -65,6 +65,14 @@ pub enum Error {
     OpenTap(open_tap::Error),
     // PTY write error
     PtyRx(devices::Error),
+    // Address allocator
+    Allocate(vm_allocator::Error),
+    // Address allocator
+    IrqAllocator(irq_allocator::Error),
+    // MmioRange
+    MmioRange,
+    // Virtio net
+    Virtio(virtio::Error),
 }
 
 /// Dedicated [`Result`](https://doc.rust-lang.org/std/result/) type.
