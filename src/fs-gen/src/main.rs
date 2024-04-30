@@ -21,12 +21,8 @@ fn run(args: CliArgs) -> Result<()> {
     let output_subdir = _binding.as_path();
 
     // image downloading and unpacking
-    let layers_paths = match download_image_fs(
-        &args.image_name,
-        &args.architecture,
-        layers_subdir,
-        &args.registry,
-    ) {
+    let layers_paths = match download_image_fs(&args.image_name, &args.architecture, layers_subdir)
+    {
         Err(e) => bail!(e),
         Ok(e) => e,
     };

@@ -46,6 +46,7 @@ pub struct Platform {
 // Container image definition consisting of repository, name and tag
 #[derive(Debug, Clone)]
 pub struct Image {
+    pub registry: String,
     pub repository: String,
     pub name: String,
     pub tag: String,
