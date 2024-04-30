@@ -1,19 +1,26 @@
-use self::vmmorchestrator::{
-    vmm_service_server::VmmService as VmmServiceTrait, RunVmmRequest, RunVmmResponse,
-};
-use crate::core::vmm::VMM;
+use self::vmmorchestrator::{vmm_service_server::VmmService as VmmServiceTrait, RunVmmRequest};
+use crate::grpc::client::agent::ExecuteRequest;
 use crate::VmmErrors;
+use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
+use std::time::Duration;
 use std::{
     convert::From,
     net::Ipv4Addr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info};
 
+type Result<T> = std::result::Result<Response<T>, tonic::Status>;
+
 pub mod vmmorchestrator {
     tonic::include_proto!("vmmorchestrator");
+}
+
+pub mod agent {
+    tonic::include_proto!("cloudlet.agent");
 }
 
 // Implement the From trait for VmmErrors into Status
@@ -33,13 +40,14 @@ pub struct VmmService;
 
 #[tonic::async_trait]
 impl VmmServiceTrait for VmmService {
-    async fn run(
-        &self,
-        _request: Request<RunVmmRequest>,
-    ) -> Result<Response<RunVmmResponse>, Status> {
-        let response = vmmorchestrator::RunVmmResponse {};
+    type RunStream =
+        ReceiverStream<std::result::Result<vmmorchestrator::ExecuteResponse, tonic::Status>>;
+
+    async fn run(&self, _request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
+        const VM_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
 
         // Check if the kernel is on the system, else build it
@@ -74,9 +82,50 @@ impl VmmServiceTrait for VmmService {
         // Configure the VMM parameters might need to be calculated rather than hardcoded
         vmm.configure(1, 512, kernel_path, &Some(initramfs_path))
             .map_err(VmmErrors::VmmConfigure)?;
-        // Run the VMM
-        vmm.run().map_err(VmmErrors::VmmRun)?;
 
-        Ok(Response::new(response))
+        // Run the VMM in a separate task
+        tokio::spawn(async move {
+            info!("Running VMM");
+            if let Err(err) = vmm.run().map_err(VmmErrors::VmmRun) {
+                error!("Error running VMM: {:?}", err);
+            }
+        });
+
+        let grpc_client = tokio::spawn(async move {
+            // Wait 2 seconds
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            println!("Connecting to Agent service");
+
+            WorkloadClient::new(VM_IP, 50051).await
+        })
+        .await
+        .unwrap();
+
+        // Send the grpc request to start the agent
+        let execute_request = ExecuteRequest {};
+
+        match grpc_client {
+            Ok(mut client) => {
+                info!("Successfully connected to Agent service");
+
+                // Start the execution
+                let mut response_stream = client.execute(execute_request).await?;
+
+                // Process each message as it arrives
+                while let Some(response) = response_stream.message().await? {
+                    let vmm_response = vmmorchestrator::ExecuteResponse {
+                        stdout: response.stdout,
+                        stderr: response.stderr,
+                        exit_code: response.exit_code,
+                    };
+                    tx.send(Ok(vmm_response)).await.unwrap();
+                }
+            }
+            Err(e) => {
+                error!("ERROR {:?}", e);
+            }
+        }
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
