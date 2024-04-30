@@ -16,9 +16,9 @@ pub(crate) enum ImageLoaderError {
     #[error("Could not find Docker v2 or OCI image manifest for `{0}`")]
     ImageManifestNotFound(Image),
 
-    /// The requested container registry wasn't found in the registries JSON file.
-    #[error("Could not find the `{0}` registry. Make sure that it was added correctly to the registries JSON file.")]
-    RegistryNotFound(String),
+    /// The requested container registry didn't provide the auth link and service in www-authenticate header
+    #[error("Could not get the auth link and service for the `{0}` registry.")]
+    RegistryAuthDataNotFound(String),
 
     /// Encountered an error during the flow.
     #[error("Image loading error: {}", .source)]
