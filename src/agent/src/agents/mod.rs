@@ -1,4 +1,4 @@
-use crate::AgentResult;
+use crate::{AgentError, AgentResult};
 use serde::Deserialize;
 
 #[cfg(feature = "debug-agent")]
@@ -36,14 +36,17 @@ impl std::fmt::Display for Language {
 }
 
 impl TryFrom<&str> for Language {
-    type Error = String;
+    type Error = AgentError;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, AgentError> {
         match value {
             "rust" => Ok(Language::Rust),
             #[cfg(feature = "debug-agent")]
             "debug" => Ok(Language::Debug),
-            _ => Err(format!("Invalid language: {}", value)),
+            _ => Err(AgentError::InvalidLanguage(format!(
+                "Invalid language: {}",
+                value
+            ))),
         }
     }
 }

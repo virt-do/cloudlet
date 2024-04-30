@@ -18,7 +18,8 @@ impl WorkloadRunner for WorkloadRunnerService {
 
         let execute_request = req.into_inner();
 
-        let runner = Runner::new_from_execute_request(execute_request);
+        let runner = Runner::new_from_execute_request(execute_request)
+            .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         let res = runner
             .run()

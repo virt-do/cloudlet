@@ -2,7 +2,7 @@ use crate::{
     agent::ExecuteRequest,
     agents::{rust, Agent, AgentOutput, Language},
     workload::config::Action,
-    AgentResult,
+    AgentError, AgentResult,
 };
 
 #[cfg(feature = "debug-agent")]
@@ -28,9 +28,9 @@ impl Runner {
         Runner { config, agent }
     }
 
-    pub fn new_from_execute_request(execute_request: ExecuteRequest) -> Self {
-        let config = Config::new_from_execute_request(execute_request);
-        Self::new(config)
+    pub fn new_from_execute_request(execute_request: ExecuteRequest) -> Result<Self, AgentError> {
+        let config = Config::new_from_execute_request(execute_request)?;
+        Ok(Self::new(config))
     }
 
     pub fn run(&self) -> AgentResult<AgentOutput> {
