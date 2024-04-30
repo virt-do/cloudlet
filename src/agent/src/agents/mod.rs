@@ -34,3 +34,16 @@ impl std::fmt::Display for Language {
         }
     }
 }
+
+impl TryFrom<&str> for Language {
+    type Error = String;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "rust" => Ok(Language::Rust),
+            #[cfg(feature = "debug-agent")]
+            "debug" => Ok(Language::Debug),
+            _ => Err(format!("Invalid language: {}", value)),
+        }
+    }
+}
