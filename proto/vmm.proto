@@ -15,8 +15,24 @@ enum LogLevel {
   ERROR = 3;
 }
 
+// TODO: Didn't managed to import it from the agent file
+message ExecuteResponse {
+  enum Stage {
+    PENDING = 0;
+    BUILDING = 1;
+    RUNNING = 2;
+    DONE = 3;
+    FAILED = 4;
+    DEBUG = 5;
+  }
+
+  string stdout = 1;
+  string stderr = 2;
+  int32 exit_code = 3;
+}
+
 service VmmService {
-  rpc Run (RunVmmRequest) returns (RunVmmResponse);
+  rpc Run (RunVmmRequest) returns (stream ExecuteResponse) {};
 }
 
 message RunVmmRequest {

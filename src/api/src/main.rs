@@ -1,5 +1,5 @@
 use actix_web::{App, HttpServer};
-use api::services::{run, shutdown};
+use api::service::{run, shutdown};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

@@ -326,7 +326,6 @@ impl VMM {
             }
         }
     }
-
     /// Configure the VMM:
     /// * `num_vcpus` Number of virtual CPUs
     /// * `mem_size_mb` Memory size (in MB)

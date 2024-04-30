@@ -1,4 +1,4 @@
-use tonic::transport::Channel;
+use tonic::{transport::Channel, Streaming};
 use vmmorchestrator::vmm_service_client::VmmServiceClient;
 
 pub mod vmmorchestrator {
@@ -18,9 +18,13 @@ impl VmmClient {
         Ok(VmmClient { client })
     }
 
-    pub async fn run_vmm(&mut self, request: vmmorchestrator::RunVmmRequest) {
+    pub async fn run_vmm(
+        &mut self,
+        request: vmmorchestrator::RunVmmRequest,
+    ) -> Result<Streaming<vmmorchestrator::ExecuteResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
-        let response = self.client.run(request).await.unwrap();
-        println!("RESPONSE={:?}", response);
+        let response_stream = self.client.run(request).await?.into_inner();
+
+        Ok(response_stream)
     }
 }

@@ -21,7 +21,7 @@ pub enum LogLevel {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct YamlClientConfigFile {
+pub struct TomlClientConfigFile {
     pub language: Language,
     pub env_path: PathBuf,
     pub code_path: PathBuf,
@@ -35,3 +35,7 @@ pub struct CloudletDtoRequest {
     pub code: String,
     pub log_level: LogLevel,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+
+pub struct AgentExecuteDtoRequest {}

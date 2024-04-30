@@ -4,7 +4,7 @@ use tonic::transport::Server;
 use tracing::info;
 use vmm::{
     core::vmm::VMM,
-    service::{vmmorchestrator, VmmService},
+    grpc::server::{vmmorchestrator, VmmService},
     VmmErrors,
 };
 mod args;
