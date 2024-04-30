@@ -16,7 +16,7 @@ message ExecuteRequest {
 
   string workload_name = 1;
   string language = 2;
-  string action = 3;
+  Action action = 3;
   Server server = 4;
   string config_str = 5;
 }
