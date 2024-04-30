@@ -47,7 +47,6 @@ impl VmmServiceTrait for VmmService {
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
-        const VM_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
         const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
@@ -97,7 +96,7 @@ impl VmmServiceTrait for VmmService {
             tokio::time::sleep(Duration::from_secs(2)).await;
             println!("Connecting to Agent service");
 
-            WorkloadClient::new(VM_IP, 50051).await
+            WorkloadClient::new(GUEST_IP, 50051).await
         })
         .await
         .unwrap();
