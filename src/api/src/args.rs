@@ -5,5 +5,5 @@ use std::path::PathBuf;
 #[command(version, about, long_about = None)]
 pub struct ApiArgs {
     #[arg(short, long)]
-    pub config_path: Option<PathBuf>
+    pub config_path: Option<PathBuf>,
 }
