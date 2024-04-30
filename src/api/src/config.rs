@@ -11,5 +11,5 @@ pub fn load_config(config_path: &PathBuf) -> io::Result<YamlApiConfigFile> {
     if let Err(e) = config_result {
         return Err(io::Error::new(io::ErrorKind::InvalidData, e));
     }
-    return Ok(config_result.unwrap());
+    Ok(config_result.unwrap())
 }
