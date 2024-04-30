@@ -9,15 +9,10 @@ message ExecuteRequest {
     PREPARE_AND_RUN = 2;
   }
 
-  message Server {
-    string address = 1;
-    int32 port = 2;
-  }
-
   string workload_name = 1;
   string language = 2;
   Action action = 3;
-  Server server = 4;
+  string code = 4;
   string config_str = 5;
 }
 
