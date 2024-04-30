@@ -42,8 +42,9 @@ impl Net {
         mem: Arc<GuestMemoryMmap>,
         device_mgr: Arc<Mutex<IoManager>>,
         mmio_cfg: MmioConfig,
-        ip_addr: Ipv4Addr,
-        mask: Ipv4Addr,
+        tap_addr: Ipv4Addr,
+        netmask: Ipv4Addr,
+        iface_guest_addr: Ipv4Addr,
         irq: u32,
         endpoint: RemoteEndpoint<Subscriber>,
         vm_fd: Arc<VmFd>,
@@ -73,7 +74,7 @@ impl Net {
 
         // Set offload flags to match the relevant virtio features of the device (for now,
         // statically set in the constructor.
-        let tap = open_tap(None, Some(ip_addr), Some(mask), &mut None, None, None)
+        let tap = open_tap(None, Some(tap_addr), Some(netmask), &mut None, None, None)
             .map_err(Error::TunTap)?;
 
         // The layout of the header is specified in the standard and is 12 bytes in size. We
@@ -87,9 +88,15 @@ impl Net {
             tap: Arc::new(Mutex::new(tap)),
         }));
 
-        let param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone())
+        let vmmio_param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone())
             .map_err(Error::Virtio)?;
-        cmdline_extra_parameters.push(param);
+        let ip_pnp_param: String = format!(
+            "ip={}::{}:{}::eth0:off",
+            iface_guest_addr, tap_addr, netmask
+        );
+
+        cmdline_extra_parameters.push(vmmio_param);
+        cmdline_extra_parameters.push(ip_pnp_param);
 
         Ok(net)
     }
