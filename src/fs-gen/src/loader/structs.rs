@@ -62,5 +62,4 @@ pub struct Registry {
     pub name: String,
     pub auth_link: String,
     pub auth_service: String,
-    pub api_v2_link: String,
 }

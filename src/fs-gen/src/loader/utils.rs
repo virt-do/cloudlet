@@ -15,11 +15,44 @@ pub(super) fn unpack_tarball(response: Response, output_dir: &Path) -> Result<()
 }
 
 /// Get a token for anonymous authentication to Docker Hub.
+pub(super) fn get_registry_auth_data(
+    client: &Client,
+    image: &Image,
+    registry_api: &str,
+) -> Result<Registry, ImageLoaderError> {
+    let manifest_url = format!(
+        "https://{}/v2/{}/{}/manifests/{}",
+        registry_api, image.repository, image.name, image.tag
+    );
+
+    let unauth_request = client
+        .get(manifest_url)
+        .send()
+        .with_context(|| "Could not send request for unauthorized authentication".to_string())?;
+    let auth_header: &str = unauth_request.headers()["www-authenticate"]
+        .to_str()
+        .map_err(|e| ImageLoaderError::Error { source: e.into() })?;
+    let auth_data: Vec<&str> = auth_header.split('"').collect();
+    if auth_data.len() != 7 {
+        Err(ImageLoaderError::RegistryAuthDataNotFound(
+            registry_api.to_string(),
+        ))?
+    }
+    Ok(Registry {
+        name: registry_api.to_string(),
+        auth_link: auth_data[1].to_string(),
+        auth_service: auth_data[3].to_string(),
+    })
+}
+
+/// Get a token for anonymous authentication to Docker Hub.
 pub(super) fn get_docker_download_token(
     client: &Client,
     image: &Image,
-    registry: &Registry,
+    registry_name: &str,
 ) -> Result<String> {
+    let registry = get_registry_auth_data(client, image, registry_name)?;
+
     let token_json: serde_json::Value = client
         .get(format!(
             "{}?service={}&scope=repository:{}/{}:pull",
@@ -60,15 +93,5 @@ pub(super) fn split_image_name(image_name: &str) -> Image {
         repository,
         name,
         tag,
-    }
-}
-
-pub(super) fn get_registry(name: &str) -> Result<Registry, ImageLoaderError> {
-    let registries_file = include_str!("../../resources/registries.json");
-    let registries: Vec<Registry> = serde_json::from_str(registries_file)
-        .with_context(|| "Failed to parse registries JSON file")?;
-    match registries.iter().find(|reg| reg.name == name) {
-        Some(reg) => Ok(reg.clone()),
-        _ => Err(ImageLoaderError::RegistryNotFound(name.to_string())),
     }
 }
