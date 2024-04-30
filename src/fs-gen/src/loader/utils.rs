@@ -18,11 +18,10 @@ pub(super) fn unpack_tarball(response: Response, output_dir: &Path) -> Result<()
 pub(super) fn get_registry_auth_data(
     client: &Client,
     image: &Image,
-    registry_api: &str,
 ) -> Result<Registry, ImageLoaderError> {
     let manifest_url = format!(
         "https://{}/v2/{}/{}/manifests/{}",
-        registry_api, image.repository, image.name, image.tag
+        image.registry, image.repository, image.name, image.tag
     );
 
     let unauth_request = client
@@ -35,23 +34,19 @@ pub(super) fn get_registry_auth_data(
     let auth_data: Vec<&str> = auth_header.split('"').collect();
     if auth_data.len() != 7 {
         Err(ImageLoaderError::RegistryAuthDataNotFound(
-            registry_api.to_string(),
+            image.registry.clone(),
         ))?
     }
     Ok(Registry {
-        name: registry_api.to_string(),
+        name: image.registry.clone(),
         auth_link: auth_data[1].to_string(),
         auth_service: auth_data[3].to_string(),
     })
 }
 
 /// Get a token for anonymous authentication to Docker Hub.
-pub(super) fn get_docker_download_token(
-    client: &Client,
-    image: &Image,
-    registry_name: &str,
-) -> Result<String> {
-    let registry = get_registry_auth_data(client, image, registry_name)?;
+pub(super) fn get_docker_download_token(client: &Client, image: &Image) -> Result<String> {
+    let registry = get_registry_auth_data(client, image)?;
 
     let token_json: serde_json::Value = client
         .get(format!(
@@ -76,22 +71,28 @@ pub(super) fn get_docker_download_token(
 
 // Get image's repository, name and tag
 pub(super) fn split_image_name(image_name: &str) -> Image {
-    let repo_and_image: Vec<&str> = image_name.splitn(2, '/').collect();
+    const DEFAULT_REGISTRY: &str = "registry-1.docker.io";
+    const DEFAULT_REPOSITORY: &str = "library";
+    const DEFAULT_TAG: &str = "latest";
 
-    let (repository, name) = if repo_and_image.len() < 2 {
-        ("library".to_string(), repo_and_image[0].to_string())
-    } else {
-        (repo_and_image[0].to_string(), repo_and_image[1].to_string())
+    let image_data: Vec<&str> = image_name.splitn(3, '/').collect();
+
+    let (registry, repository, name) = match image_data.len() {
+        1 => (DEFAULT_REGISTRY, DEFAULT_REPOSITORY, image_data[0]),
+        2 => (DEFAULT_REGISTRY, image_data[0], image_data[1]),
+        _ => (image_data[0], image_data[1], image_data[2]),
     };
     let image_and_tag: Vec<&str> = name.split(':').collect();
     let (name, tag) = if image_and_tag.len() < 2 {
-        (image_and_tag[0].to_string(), "latest".to_string())
+        (image_and_tag[0], DEFAULT_TAG)
     } else {
-        (image_and_tag[0].to_string(), image_and_tag[1].to_string())
+        (image_and_tag[0], image_and_tag[1])
     };
+
     Image {
-        repository,
-        name,
-        tag,
+        registry: registry.to_string(),
+        repository: repository.to_string(),
+        name: name.to_string(),
+        tag: tag.to_string(),
     }
 }

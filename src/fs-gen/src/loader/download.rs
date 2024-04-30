@@ -13,15 +13,14 @@ pub(crate) fn download_image_fs(
     image_name: &str,
     architecture: &str,
     output_file: PathBuf,
-    registry_api: &str,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
     let image = split_image_name(image_name);
 
     // Get download token and download manifest
     let client = Client::new();
-    let token = &get_docker_download_token(&client, &image, registry_api)?;
-    let manifest = download_manifest(&client, token, &image, &image.tag, registry_api)
+    let token = &get_docker_download_token(&client, &image)?;
+    let manifest = download_manifest(&client, token, &image, &image.tag)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
 
     if let ManifestV2::ImageManifest(m) = manifest {
@@ -33,15 +32,8 @@ pub(crate) fn download_image_fs(
         );
         create_dir_all(&output_file)
             .with_context(|| "Could not create output directory for image downloading")?;
-        return download_layers(
-            &m.layers,
-            &client,
-            token,
-            &image,
-            &output_file,
-            registry_api,
-        )
-        .map_err(|e| ImageLoaderError::Error { source: e });
+        return download_layers(&m.layers, &client, token, &image, &output_file)
+            .map_err(|e| ImageLoaderError::Error { source: e });
     }
 
     // Below, we assume that the image is multi-platform and we received a list of manifests (fat manifest).
@@ -69,7 +61,7 @@ pub(crate) fn download_image_fs(
         Some(m) => {
             debug!("Downloading architecture-specific manifest");
 
-            download_manifest(&client, token, &image, &m.digest, registry_api)
+            download_manifest(&client, token, &image, &m.digest)
                 .map_err(|e| ImageLoaderError::Error { source: e })?
         }
     };
@@ -79,15 +71,8 @@ pub(crate) fn download_image_fs(
         ManifestV2::ImageManifest(m) => {
             create_dir_all(&output_file)
                 .with_context(|| "Could not create output directory for image downloading")?;
-            download_layers(
-                &m.layers,
-                &client,
-                token,
-                &image,
-                &output_file,
-                registry_api,
-            )
-            .map_err(|e| ImageLoaderError::Error { source: e })
+            download_layers(&m.layers, &client, token, &image, &output_file)
+                .map_err(|e| ImageLoaderError::Error { source: e })
         }
         _ => Err(ImageLoaderError::ImageManifestNotFound(image.clone()))?,
     }
@@ -98,12 +83,11 @@ fn download_manifest(
     token: &str,
     image: &Image,
     digest: &str,
-    registry_api: &str,
 ) -> Result<ManifestV2> {
     // Query Docker Hub API to get the image manifest
     let manifest_url = format!(
         "https://{}/v2/{}/{}/manifests/{}",
-        registry_api, image.repository, image.name, digest
+        image.registry, image.repository, image.name, digest
     );
 
     let manifest: ManifestV2 = client
@@ -138,7 +122,6 @@ fn download_layers(
     token: &str,
     image: &Image,
     output_dir: &Path,
-    registry_api: &str,
 ) -> Result<Vec<PathBuf>> {
     info!("Downloading and unpacking layers...");
 
@@ -149,7 +132,7 @@ fn download_layers(
         let digest = &layer.digest;
         let layer_url = format!(
             "https://{}/v2/{}/{}/blobs/{}",
-            registry_api, image.repository, image.name, digest
+            image.registry, image.repository, image.name, digest
         );
 
         let response = client
