@@ -1,6 +1,7 @@
 use crate::loader::errors::ImageLoaderError;
 use crate::loader::structs::{Image, Registry};
 use anyhow::{Context, Result};
+use clap_stdin::MaybeStdin;
 use flate2::read::GzDecoder;
 use reqwest::blocking::{Client, Response};
 use std::path::Path;
@@ -49,7 +50,7 @@ pub(super) fn get_docker_download_token(
     client: &Client,
     image: &Image,
     username: Option<String>,
-    password: Option<String>,
+    password: Option<MaybeStdin<String>>,
 ) -> Result<String> {
     let registry = get_registry_auth_data(client, image)?;
 

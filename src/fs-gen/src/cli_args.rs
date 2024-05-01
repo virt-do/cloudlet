@@ -1,6 +1,7 @@
 use std::{env, path::PathBuf};
 
 use clap::{command, error::ErrorKind, ArgAction, CommandFactory, Parser};
+use clap_stdin::MaybeStdin;
 use regex::Regex;
 
 use once_cell::sync::Lazy;
@@ -38,12 +39,12 @@ pub struct CliArgs {
     pub debug: bool,
 
     /// Username to pull image from a private repository
-    #[arg(short='u', default_value=None)]
+    #[arg(short='u', long="username", default_value=None)]
     pub username: Option<String>,
 
-    /// Password to pull image from a private repository
-    #[arg(short='p', default_value=None)]
-    pub password: Option<String>,
+    /// Password can also be passed via STDIN: [echo <PASSWORD> | fs-gen ... -p -]
+    #[arg(short='p', long="password", default_value=None)]
+    pub password: Option<MaybeStdin<String>>,
 }
 
 impl CliArgs {
