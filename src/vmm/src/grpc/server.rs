@@ -1,7 +1,7 @@
-use crate::grpc::client::agent::ExecuteRequest;
 use self::vmmorchestrator::{
-    vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest
+    vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest,
 };
+use crate::grpc::client::agent::ExecuteRequest;
 use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::time::Duration;
@@ -89,7 +89,8 @@ impl VmmServiceTrait for VmmService {
 
         // get request with the language
         let vmm_request = request.into_inner();
-        let language: Language = Language::from_i32(vmm_request.language).expect("Unknown language");
+        let language: Language =
+            Language::from_i32(vmm_request.language).expect("Unknown language");
 
         let image = match language {
             Language::Rust => {
