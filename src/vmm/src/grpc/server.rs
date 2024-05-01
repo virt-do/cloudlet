@@ -103,7 +103,6 @@ impl VmmServiceTrait for VmmService {
 
         // Send the grpc request to start the agent
         let vmm_request = request.into_inner();
-        println!("HERRREEEE {}", vmm_request.language);
         let agent_request = ExecuteRequest {
             workload_name: vmm_request.workload_name,
             language: match vmm_request.language {
