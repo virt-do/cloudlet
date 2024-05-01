@@ -8,7 +8,6 @@ use std::{fs::create_dir_all, process::Command};
 #[serde(rename_all = "kebab-case")]
 struct RustAgentBuildConfig {
     release: bool,
-    source_code_path: String,
 }
 
 #[derive(Deserialize)]
@@ -66,8 +65,6 @@ impl From<workload::config::Config> for RustAgent {
 
 impl Agent for RustAgent {
     fn prepare(&self) -> AgentResult<AgentOutput> {
-        let code = std::fs::read_to_string(&self.rust_config.build.source_code_path).unwrap();
-
         let function_dir = format!(
             "/tmp/{}",
             Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
@@ -77,8 +74,11 @@ impl Agent for RustAgent {
 
         create_dir_all(format!("{}/src", &function_dir)).expect("Unable to create directory");
 
-        std::fs::write(format!("{}/src/main.rs", &function_dir), code)
-            .expect("Unable to write main.rs file");
+        std::fs::write(
+            format!("{}/src/main.rs", &function_dir),
+            &self.workload_config.code,
+        )
+        .expect("Unable to write main.rs file");
 
         let cargo_toml = format!(
             r#"

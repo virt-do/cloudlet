@@ -27,13 +27,7 @@ mount -t sysfs sysfs /sys
 
 ip link set up dev lo
 
-slattach -L /dev/ttyS1&
-
-while ! ifconfig sl0 &> /dev/null; do
-    sleep 1
-done
-
-ifconfig sl0 172.30.0.11 netmask 255.255.0.0 up
+ifconfig eth0 172.29.0.2 netmask 255.255.0.0 up
 
 /agent
 

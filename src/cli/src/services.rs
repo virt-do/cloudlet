@@ -1,30 +1,17 @@
 use crate::utils::ConfigFileHandler;
 use reqwest::Client;
 use serde::Deserialize;
-use shared_models::{CloudletDtoRequest, Language};
-use std::{error::Error, path::PathBuf};
+use shared_models::{BuildConfig, CloudletDtoRequest, Language, ServerConfig};
+use std::error::Error;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct TomlConfig {
     #[serde(rename = "workload-name")]
-    _workload_name: String,
+    workload_name: String,
     language: Language,
-    _action: String,
-    _server: ServerConfig,
+    action: String,
+    server: ServerConfig,
     build: BuildConfig,
-}
-
-#[derive(Deserialize)]
-struct ServerConfig {
-    _address: String,
-    _port: u16,
-}
-
-#[derive(Deserialize)]
-struct BuildConfig {
-    #[serde(rename = "source-code-path")]
-    source_code_path: PathBuf,
-    _release: bool,
 }
 
 pub struct CloudletClient {}
@@ -34,16 +21,19 @@ impl CloudletClient {
         let config: TomlConfig =
             toml::from_str(&config).expect("Error while parsing the config file");
 
+        let workload_name = config.workload_name;
         let code: String = ConfigFileHandler::read_file(&config.build.source_code_path)
             .expect("Error while reading the code file");
-        let env = "";
 
         let language = config.language;
         CloudletDtoRequest {
+            workload_name,
             language,
             code,
-            env: env.to_string(),
             log_level: shared_models::LogLevel::INFO,
+            server: config.server,
+            build: config.build,
+            action: config.action,
         }
     }
 

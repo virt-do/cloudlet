@@ -6,7 +6,7 @@ use actix_web::{post, web, HttpResponse, Responder};
 use actix_web_lab::sse;
 use async_stream::stream;
 use serde::Serialize;
-use shared_models::CloudletDtoRequest;
+use shared_models::{CloudletDtoRequest, Language};
 use tokio_stream::StreamExt;
 use tonic::Streaming;
 
@@ -16,10 +16,16 @@ pub async fn run(req_body: web::Json<CloudletDtoRequest>) -> impl Responder {
 
     let mut client = VmmClient::new().await.unwrap();
 
+    println!("Request: {:?}", req);
+
     let vmm_request = RunVmmRequest {
+        workload_name: req.workload_name,
         code: req.code,
-        env: req.env,
-        language: req.language as i32,
+        language: match req.language {
+            Language::PYTHON => 0,
+            Language::NODE => 1,
+            Language::RUST => 2,
+        },
         log_level: req.log_level as i32,
     };
 

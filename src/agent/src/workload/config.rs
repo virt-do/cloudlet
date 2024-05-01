@@ -1,13 +1,10 @@
-use crate::{agents::Language, AgentError, AgentResult};
+use crate::{
+    agent::{execute_request, ExecuteRequest},
+    agents::Language,
+    AgentError, AgentResult,
+};
 use serde::Deserialize;
 use std::path::PathBuf;
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct Server {
-    pub address: String,
-    pub port: u16,
-}
 
 /// Generic agent configuration.
 #[derive(Debug, Clone, Deserialize)]
@@ -19,10 +16,9 @@ pub struct Config {
     pub language: Language,
     /// Action to perform.
     pub action: Action,
-    /// Server configuration.
-    pub server: Server,
+    /// Code
+    pub code: String,
     /// Rest of the configuration as a string.
-    #[serde(skip)]
     pub config_string: String,
 }
 
@@ -38,6 +34,16 @@ impl Config {
 
         Ok(config)
     }
+
+    pub fn new_from_execute_request(execute_request: ExecuteRequest) -> Result<Self, AgentError> {
+        Ok(Self {
+            workload_name: execute_request.workload_name.clone(),
+            language: Language::try_from(execute_request.language.clone().as_str())?,
+            action: execute_request.action().into(),
+            config_string: execute_request.config_str,
+            code: execute_request.code,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -46,4 +52,14 @@ pub enum Action {
     Prepare,
     Run,
     PrepareAndRun,
+}
+
+impl From<execute_request::Action> for Action {
+    fn from(value: execute_request::Action) -> Self {
+        match value {
+            execute_request::Action::Prepare => Action::Prepare,
+            execute_request::Action::Run => Action::Run,
+            execute_request::Action::PrepareAndRun => Action::PrepareAndRun,
+        }
+    }
 }

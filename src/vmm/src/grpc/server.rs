@@ -43,7 +43,7 @@ impl VmmServiceTrait for VmmService {
     type RunStream =
         ReceiverStream<std::result::Result<vmmorchestrator::ExecuteResponse, tonic::Status>>;
 
-    async fn run(&self, _request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
+    async fn run(&self, request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
@@ -102,14 +102,26 @@ impl VmmServiceTrait for VmmService {
         .unwrap();
 
         // Send the grpc request to start the agent
-        let execute_request = ExecuteRequest {};
+        let vmm_request = request.into_inner();
+        let agent_request = ExecuteRequest {
+            workload_name: vmm_request.workload_name,
+            language: match vmm_request.language {
+                0 => "python".to_string(),
+                1 => "node".to_string(),
+                2 => "rust".to_string(),
+                _ => unreachable!("Invalid language"),
+            },
+            action: 2, // Prepare and run
+            code: vmm_request.code,
+            config_str: "[build]\nrelease = true".to_string(),
+        };
 
         match grpc_client {
             Ok(mut client) => {
                 info!("Successfully connected to Agent service");
 
                 // Start the execution
-                let mut response_stream = client.execute(execute_request).await?;
+                let mut response_stream = client.execute(agent_request).await?;
 
                 // Process each message as it arrives
                 while let Some(response) = response_stream.message().await? {
