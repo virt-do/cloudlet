@@ -59,7 +59,7 @@ pub struct CliArguments {
 
 impl CliArguments {
     /// Get the log level filter.
-    pub fn _convert_log_to_tracing(&self) -> level_filters::LevelFilter {
+    pub fn convert_log_to_tracing(&self) -> level_filters::LevelFilter {
         match self.verbose.log_level_filter() {
             log::LevelFilter::Off => level_filters::LevelFilter::OFF,
             log::LevelFilter::Error => level_filters::LevelFilter::ERROR,

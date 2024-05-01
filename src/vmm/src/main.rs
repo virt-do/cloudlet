@@ -14,8 +14,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse the configuration and configure logger verbosity
     let args = CliArgs::parse();
 
-    tracing_subscriber::fmt().init();
-
     info!(
         app_name = env!("CARGO_PKG_NAME"),
         app_version = env!("CARGO_PKG_VERSION"),
@@ -28,6 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // check if the args is grpc or command
     match args.command {
         Commands::Grpc => {
+            tracing_subscriber::fmt().init();
             Server::builder()
                 .add_service(vmmorchestrator::vmm_service_server::VmmServiceServer::new(
                     vmm_service,
@@ -36,6 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await?;
         }
         Commands::Cli(cli_args) => {
+            tracing_subscriber::fmt()
+                .with_max_level(cli_args.convert_log_to_tracing())
+                .init();
+
             // Create a new VMM
             let mut vmm = VMM::new(
                 cli_args.iface_host_addr,
