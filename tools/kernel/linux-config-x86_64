@@ -1475,6 +1475,8 @@ CONFIG_VIRTIO_NET=y
 # CONFIG_PPP is not set
 CONFIG_SLIP=y
 CONFIG_SLIP_COMPRESSED=y
+CONFIG_SLIP_SMART=n
+CONFIG_SLIP_MODE_SLIP6=n
 
 #
 # Host-side USB support is needed for USB Network Adapter support

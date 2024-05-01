@@ -29,7 +29,7 @@ use super::irq_allocator::IrqAllocator;
 use super::slip_pty::SlipPty;
 
 #[cfg(target_arch = "x86_64")]
-pub(crate) const MMIO_GAP_END: u64 = 1 << 32;
+pub(crate) const MMIO_GAP_END: u64 = 1 << 34;
 /// Size of the MMIO gap.
 #[cfg(target_arch = "x86_64")]
 pub(crate) const MMIO_GAP_SIZE: u64 = 768 << 20;

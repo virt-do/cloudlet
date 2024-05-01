@@ -22,9 +22,9 @@ pub async fn run(req_body: web::Json<CloudletDtoRequest>) -> impl Responder {
         workload_name: req.workload_name,
         code: req.code,
         language: match req.language {
-            Language::PYTHON => 0,
-            Language::NODE => 1,
-            Language::RUST => 2,
+            Language::RUST => 0,
+            Language::PYTHON => 1,
+            Language::NODE => 2,
         },
         log_level: req.log_level as i32,
     };
