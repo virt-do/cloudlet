@@ -27,7 +27,7 @@ pub(super) fn get_registry_auth_data(
     let unauth_request = client
         .get(manifest_url)
         .send()
-        .with_context(|| "Could not send request for unauthorized authentication".to_string())?;
+        .with_context(|| format!("Could not send request to {}", image.registry))?;
     let auth_header: &str = unauth_request.headers()["www-authenticate"]
         .to_str()
         .map_err(|e| ImageLoaderError::Error { source: e.into() })?;
@@ -45,25 +45,46 @@ pub(super) fn get_registry_auth_data(
 }
 
 /// Get a token for anonymous authentication to Docker Hub.
-pub(super) fn get_docker_download_token(client: &Client, image: &Image) -> Result<String> {
+pub(super) fn get_docker_download_token(
+    client: &Client,
+    image: &Image,
+    username: Option<String>,
+    password: Option<String>,
+) -> Result<String> {
     let registry = get_registry_auth_data(client, image)?;
 
-    let token_json: serde_json::Value = client
-        .get(format!(
-            "{}?service={}&scope=repository:{}/{}:pull",
-            registry.auth_link, registry.auth_service, image.repository, image.name
-        ))
+    let mut request = client.get(format!(
+        "{}?service={}&scope=repository:{}/{}:pull",
+        registry.auth_link, registry.auth_service, image.repository, image.name
+    ));
+    let mut auth_type = "";
+
+    match username {
+        Some(u) => {
+            request = request.basic_auth(u, password);
+        }
+        None => {
+            auth_type = "anonymous ";
+        }
+    };
+
+    let token_json: serde_json::Value = request
         .send()
-        .with_context(|| "Could not send request for anonymous authentication".to_string())?
+        .with_context(|| format!("Could not send request for {}authentication", auth_type))?
         .json()
         .with_context(|| {
-            "Failed to parse JSON response for anonymous authentication".to_string()
+            format!(
+                "Failed to parse JSON response for {}authentication",
+                auth_type
+            )
         })?;
 
-    match token_json["token"]
-        .as_str()
-        .with_context(|| "Failed to get token from the anonymous auth response".to_string())
-    {
+    match token_json["token"].as_str().with_context(|| {
+        format!(
+            "Failed to get token from the {}authentication response",
+            auth_type
+        )
+    }) {
         Ok(t) => Ok(t.to_owned()),
         Err(e) => Err(e),
     }

@@ -13,6 +13,8 @@ pub(crate) fn download_image_fs(
     image_name: &str,
     architecture: &str,
     output_file: PathBuf,
+    username: Option<String>,
+    password: Option<String>,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
     let image = Image::from_str(image_name);
@@ -26,7 +28,7 @@ pub(crate) fn download_image_fs(
 
     // Get download token and download manifest
     let client = Client::new();
-    let token = &get_docker_download_token(&client, &image)?;
+    let token = &get_docker_download_token(&client, &image, username, password)?;
     let manifest = download_manifest(&client, token, &image, &image.tag)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
 
