@@ -22,16 +22,16 @@ pub enum LogLevel {
 
 #[derive(Deserialize, Debug)]
 pub struct TomlClientConfigFile {
+    pub worklaod_name: String,
     pub language: Language,
-    pub env_path: PathBuf,
     pub code_path: PathBuf,
     pub log_level: LogLevel,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CloudletDtoRequest {
+    pub workload_name: String,
     pub language: Language,
-    pub env: String,
     pub code: String,
     pub log_level: LogLevel,
 }

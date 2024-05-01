@@ -7,7 +7,7 @@ use tonic::transport::Server;
 
 #[derive(Debug, Parser)]
 struct Args {
-    #[clap(long, env, default_value = "localhost")]
+    #[clap(long, env, default_value = "0.0.0.0")]
     grpc_server_address: String,
     #[clap(long, env, default_value = "50051")]
     grpc_server_port: u16,

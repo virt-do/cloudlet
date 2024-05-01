@@ -36,10 +36,9 @@ service VmmService {
 }
 
 message RunVmmRequest {
-
-  Language language = 1;
-  string code = 2;
-  string env = 3;
+  string workload_name = 1;
+  Language language = 2;
+  string code = 3;
   LogLevel log_level = 4;
 
 }
