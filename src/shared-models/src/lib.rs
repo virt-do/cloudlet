@@ -51,7 +51,6 @@ pub struct BuildConfig {
     pub release: bool,
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 
 pub struct AgentExecuteDtoRequest {}

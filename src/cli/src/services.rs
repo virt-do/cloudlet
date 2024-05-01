@@ -2,7 +2,7 @@ use crate::utils::ConfigFileHandler;
 use reqwest::Client;
 use serde::Deserialize;
 use shared_models::{BuildConfig, CloudletDtoRequest, Language, ServerConfig};
-use std::{error::Error, path::PathBuf};
+use std::error::Error;
 
 #[derive(Deserialize, Debug)]
 struct TomlConfig {
@@ -14,14 +14,13 @@ struct TomlConfig {
     build: BuildConfig,
 }
 
-
 pub struct CloudletClient {}
 
 impl CloudletClient {
     pub fn new_cloudlet_config(config: String) -> CloudletDtoRequest {
         let config: TomlConfig =
             toml::from_str(&config).expect("Error while parsing the config file");
-        
+
         let workload_name = config.workload_name;
         let code: String = ConfigFileHandler::read_file(&config.build.source_code_path)
             .expect("Error while reading the code file");
