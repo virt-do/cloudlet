@@ -25,7 +25,6 @@ pub async fn run(req_body: web::Json<CloudletDtoRequest>) -> impl Responder {
             Language::PYTHON => 0,
             Language::NODE => 1,
             Language::RUST => 2,
-            _ => unreachable!("Invalid language"),
         },
         log_level: req.log_level as i32,
     };

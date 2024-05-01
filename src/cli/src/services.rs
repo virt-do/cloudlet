@@ -33,6 +33,7 @@ impl CloudletClient {
             log_level: shared_models::LogLevel::INFO,
             server: config.server,
             build: config.build,
+            action: config.action,
         }
     }
 

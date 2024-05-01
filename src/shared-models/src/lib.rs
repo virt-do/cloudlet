@@ -34,6 +34,7 @@ pub struct CloudletDtoRequest {
     pub language: Language,
     pub code: String,
     pub log_level: LogLevel,
+    pub action: String,
     pub server: ServerConfig,
     pub build: BuildConfig,
 }
