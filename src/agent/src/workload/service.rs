@@ -1,7 +1,9 @@
 use super::runner::Runner;
 use crate::agent::{self, execute_response::Stage, ExecuteRequest, ExecuteResponse, SignalRequest};
 use agent::workload_runner_server::WorkloadRunner;
-use std::process;
+use std::collections::HashSet;
+use std::{process, sync::Arc};
+use tokio::sync::Mutex;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
 
@@ -23,6 +25,7 @@ impl WorkloadRunner for WorkloadRunnerService {
 
         let res = runner
             .run()
+            .await
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         let _ = tx
@@ -42,6 +45,16 @@ impl WorkloadRunner for WorkloadRunnerService {
     }
 
     async fn signal(&self, _: Request<SignalRequest>) -> Result<()> {
+        let child_processes = self.child_processes.lock().await;
+
+        for &child_id in child_processes.iter() {
+            nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(child_id as i32),
+                nix::sys::signal::Signal::SIGTERM,
+            )
+            .unwrap();
+        }
+
         process::exit(0);
     }
 }

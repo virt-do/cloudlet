@@ -2,7 +2,12 @@ use super::{Agent, AgentOutput};
 use crate::{workload, AgentError, AgentResult};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
+use std::collections::HashSet;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
 use std::{fs::create_dir_all, process::Command};
+use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -21,14 +26,22 @@ pub struct RustAgent {
 }
 
 impl RustAgent {
-    fn build(&self, function_dir: &String) -> AgentResult<AgentOutput> {
+    async fn build(
+        &self,
+        function_dir: &String,
+        child_processes: &Arc<Mutex<HashSet<u32>>>,
+    ) -> AgentResult<AgentOutput> {
         if self.rust_config.build.release {
-            let output = Command::new("cargo")
+            let child = Command::new("cargo")
                 .arg("build")
                 .arg("--release")
                 .current_dir(function_dir)
-                .output()
+                .spawn()
                 .expect("Failed to build function");
+
+            child_processes.lock().await.insert(child.id());
+
+            let output = child.wait_with_output().expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -64,15 +77,21 @@ impl From<workload::config::Config> for RustAgent {
 }
 
 impl Agent for RustAgent {
-    fn prepare(&self) -> AgentResult<AgentOutput> {
-        let function_dir = format!(
-            "/tmp/{}",
-            Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
-        );
+    fn prepare<'a>(
+        &'a self,
+        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
+    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>> {
+        Box::pin(async {
+            let code = std::fs::read_to_string(&self.rust_config.build.source_code_path).unwrap();
 
-        println!("Function directory: {}", function_dir);
+            let function_dir = format!(
+                "/tmp/{}",
+                Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+            );
 
-        create_dir_all(format!("{}/src", &function_dir)).expect("Unable to create directory");
+            println!("Function directory: {}", function_dir);
+
+            create_dir_all(format!("{}/src", &function_dir)).expect("Unable to create directory");
 
         std::fs::write(
             format!("{}/src/main.rs", &function_dir),
@@ -93,7 +112,7 @@ impl Agent for RustAgent {
         std::fs::write(format!("{}/Cargo.toml", &function_dir), cargo_toml)
             .expect("Unable to write Cargo.toml file");
 
-        let result = self.build(&function_dir)?;
+            let result = self.build(&function_dir, child_processes).await?;
 
         if result.exit_code != 0 {
             println!("Build failed: {:?}", result);
@@ -131,10 +150,14 @@ impl Agent for RustAgent {
         })
     }
 
-    fn run(&self) -> AgentResult<AgentOutput> {
-        let output = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
-            .output()
-            .expect("Failed to run function");
+    fn run<'a>(
+        &'a self,
+        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
+    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>> {
+        Box::pin(async {
+            let child = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
+                .spawn()
+                .expect("Failed to run function");
 
         let agent_output = AgentOutput {
             exit_code: output.status.code().unwrap(),

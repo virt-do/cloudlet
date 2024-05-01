@@ -1,5 +1,10 @@
 use crate::{AgentError, AgentResult};
 use serde::Deserialize;
+use std::collections::HashSet;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[cfg(feature = "debug-agent")]
 pub mod debug;
@@ -13,8 +18,14 @@ pub struct AgentOutput {
 }
 
 pub trait Agent {
-    fn prepare(&self) -> AgentResult<AgentOutput>;
-    fn run(&self) -> AgentResult<AgentOutput>;
+    fn prepare<'a>(
+        &'a self,
+        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
+    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>>;
+    fn run<'a>(
+        &'a self,
+        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
+    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>>;
 }
 
 #[derive(Debug, Clone, Deserialize)]
