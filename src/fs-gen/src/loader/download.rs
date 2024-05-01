@@ -1,6 +1,6 @@
 use crate::loader::errors::ImageLoaderError;
 use crate::loader::structs::{Layer, ManifestV2};
-use crate::loader::utils::{get_docker_download_token, split_image_name, unpack_tarball};
+use crate::loader::utils::{get_docker_download_token, unpack_tarball};
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
 use std::fs::create_dir_all;
@@ -15,7 +15,14 @@ pub(crate) fn download_image_fs(
     output_file: PathBuf,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
-    let image = split_image_name(image_name);
+    let image = Image::from_str(image_name);
+    debug!(
+        registry = image.registry,
+        repository = image.repository,
+        name = image.name,
+        tag = image.tag,
+        "image:",
+    );
 
     // Get download token and download manifest
     let client = Client::new();

@@ -68,31 +68,3 @@ pub(super) fn get_docker_download_token(client: &Client, image: &Image) -> Resul
         Err(e) => Err(e),
     }
 }
-
-// Get image's repository, name and tag
-pub(super) fn split_image_name(image_name: &str) -> Image {
-    const DEFAULT_REGISTRY: &str = "registry-1.docker.io";
-    const DEFAULT_REPOSITORY: &str = "library";
-    const DEFAULT_TAG: &str = "latest";
-
-    let image_data: Vec<&str> = image_name.splitn(3, '/').collect();
-
-    let (registry, repository, name) = match image_data.len() {
-        1 => (DEFAULT_REGISTRY, DEFAULT_REPOSITORY, image_data[0]),
-        2 => (DEFAULT_REGISTRY, image_data[0], image_data[1]),
-        _ => (image_data[0], image_data[1], image_data[2]),
-    };
-    let image_and_tag: Vec<&str> = name.split(':').collect();
-    let (name, tag) = if image_and_tag.len() < 2 {
-        (image_and_tag[0], DEFAULT_TAG)
-    } else {
-        (image_and_tag[0], image_and_tag[1])
-    };
-
-    Image {
-        registry: registry.to_string(),
-        repository: repository.to_string(),
-        name: name.to_string(),
-        tag: tag.to_string(),
-    }
-}
