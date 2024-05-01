@@ -3,9 +3,9 @@ syntax = "proto3";
 package vmmorchestrator;
 
 enum Language {
-  PYTHON = 0;
-  NODE = 1;
-  RUST = 2;
+  RUST = 0;
+  PYTHON = 1;
+  NODE = 2;
 }
 
 enum LogLevel {
