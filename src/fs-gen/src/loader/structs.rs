@@ -52,6 +52,48 @@ pub struct Image {
     pub tag: String,
 }
 
+impl Image {
+    // Get image's repository, name and tag
+    pub fn from_str(image_name: &str) -> Image {
+        const DEFAULT_REGISTRY: &str = "registry-1.docker.io";
+        const DEFAULT_REPOSITORY: &str = "library";
+        const DEFAULT_TAG: &str = "latest";
+
+        let mut image_data: Vec<&str> = image_name
+            .trim_start_matches("docker.io/")
+            .splitn(3, '/')
+            .collect();
+
+        let registry = if image_data[0].contains('.') {
+            image_data.remove(0).to_string()
+        } else {
+            DEFAULT_REGISTRY.to_string()
+        };
+
+        let (repository, name) = match image_data.len() {
+            1 => (DEFAULT_REPOSITORY.to_string(), image_data[0].to_string()),
+            2 => (image_data[0].to_string(), image_data[1].to_string()),
+            _ => (
+                image_data[0].to_string(),
+                image_data[1].to_string() + "/" + image_data[2],
+            ),
+        };
+        let image_and_tag: Vec<&str> = name.split(':').collect();
+        let (name, tag) = if image_and_tag.len() < 2 {
+            (image_and_tag[0].to_string(), DEFAULT_TAG.to_string())
+        } else {
+            (image_and_tag[0].to_string(), image_and_tag[1].to_string())
+        };
+
+        Image {
+            registry,
+            repository,
+            name,
+            tag,
+        }
+    }
+}
+
 impl fmt::Display for Image {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}/{}:{}", self.repository, self.name, self.tag)
