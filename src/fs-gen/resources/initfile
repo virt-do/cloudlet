@@ -8,7 +8,11 @@ mount -t sysfs sysfs /sys
 
 ip link set up dev lo
 
-ifconfig eth0 172.29.0.2 netmask 255.255.0.0 up
+export CARGO_HOME='/usr/local/cargo'
+export RUSTUP_HOME='/usr/local/rustup'
+export RUST_VERSION='1.77.2'
+
+export PATH=$CARGO_HOME/bin:$PATH
 
 /agent
 

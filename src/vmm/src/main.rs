@@ -36,9 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .await?;
         }
         Commands::Cli(cli_args) => {
-            tracing_subscriber::fmt()
-                .with_max_level(cli_args.convert_log_to_tracing())
-                .init();
             // Create a new VMM
             let mut vmm = VMM::new(
                 cli_args.iface_host_addr,

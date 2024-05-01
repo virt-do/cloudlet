@@ -88,8 +88,8 @@ impl VmmServiceTrait for VmmService {
         initramfs_entire_file_path.push("/tools/rootfs/");
 
         // get request with the language
-        let req: RunVmmRequest = request.into_inner();
-        let language: Language = Language::from_i32(req.language).expect("Unknown language");
+        let vmm_request = request.into_inner();
+        let language: Language = Language::from_i32(vmm_request.language).expect("Unknown language");
 
         let image = match language {
             Language::Rust => {
@@ -181,13 +181,12 @@ impl VmmServiceTrait for VmmService {
         .unwrap();
 
         // Send the grpc request to start the agent
-        let vmm_request = request.into_inner();
         let agent_request = ExecuteRequest {
             workload_name: vmm_request.workload_name,
             language: match vmm_request.language {
-                0 => "python".to_string(),
-                1 => "node".to_string(),
-                2 => "rust".to_string(),
+                0 => "rust".to_string(),
+                1 => "python".to_string(),
+                2 => "node".to_string(),
                 _ => unreachable!("Invalid language"),
             },
             action: 2, // Prepare and run
