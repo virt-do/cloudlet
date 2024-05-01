@@ -107,16 +107,15 @@ impl VmmServiceTrait for VmmService {
         let agent_request = ExecuteRequest {
             workload_name: vmm_request.workload_name,
             language: match vmm_request.language {
-                0 => "python".to_string(), 
+                0 => "python".to_string(),
                 1 => "node".to_string(),
                 2 => "rust".to_string(),
-                _ => unreachable!("Invalid language")
+                _ => unreachable!("Invalid language"),
             },
             action: 2, // Prepare and run
             code: vmm_request.code,
             config_str: "[build]\nrelease = true".to_string(),
         };
-
 
         match grpc_client {
             Ok(mut client) => {
