@@ -2,6 +2,7 @@ use crate::loader::errors::ImageLoaderError;
 use crate::loader::structs::{Layer, ManifestV2};
 use crate::loader::utils::{get_docker_download_token, unpack_tarball};
 use anyhow::{Context, Result};
+use clap_stdin::MaybeStdin;
 use reqwest::blocking::Client;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
@@ -14,7 +15,7 @@ pub(crate) fn download_image_fs(
     architecture: &str,
     output_file: PathBuf,
     username: Option<String>,
-    password: Option<String>,
+    password: Option<MaybeStdin<String>>,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
     let image = Image::from_str(image_name);
