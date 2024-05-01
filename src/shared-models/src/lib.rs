@@ -34,7 +34,23 @@ pub struct CloudletDtoRequest {
     pub language: Language,
     pub code: String,
     pub log_level: LogLevel,
+    pub server: ServerConfig,
+    pub build: BuildConfig,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ServerConfig {
+    pub address: String,
+    pub port: u16,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BuildConfig {
+    #[serde(rename = "source-code-path")]
+    pub source_code_path: PathBuf,
+    pub release: bool,
+}
+
 
 #[derive(Serialize, Deserialize, Debug)]
 
