@@ -38,7 +38,6 @@ impl Config {
     pub fn new_from_execute_request(execute_request: ExecuteRequest) -> Result<Self, AgentError> {
         Ok(Self {
             workload_name: execute_request.workload_name.clone(),
-            // TODO: Fix this unwrap
             language: Language::try_from(execute_request.language.clone().as_str())?,
             action: execute_request.action().into(),
             config_string: execute_request.config_str,
