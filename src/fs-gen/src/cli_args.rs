@@ -36,6 +36,14 @@ pub struct CliArgs {
 
     #[arg(short='d', long="debug", action=ArgAction::SetTrue)]
     pub debug: bool,
+
+    /// Username to pull image from a private repository
+    #[arg(short='u', default_value=None)]
+    pub username: Option<String>,
+
+    /// Password to pull image from a private repository
+    #[arg(short='p', default_value=None)]
+    pub password: Option<String>,
 }
 
 impl CliArgs {
@@ -45,6 +53,7 @@ impl CliArgs {
 
         args.validate_image();
         args.validate_host_path();
+        args.validate_auth();
 
         args
     }
@@ -69,6 +78,26 @@ impl CliArgs {
                     "File not found for agent binary: \"{}\"",
                     self.agent_host_path.to_string_lossy()
                 ),
+            )
+            .exit();
+        }
+    }
+
+    fn validate_auth(&self) {
+        let mut cmd = CliArgs::command();
+        let instruction =
+            "Define both username and password to connect to a private image repository.";
+        if self.username.is_none() && self.password.is_some() {
+            cmd.error(
+                ErrorKind::InvalidValue,
+                format!("Username not provided. {}", instruction),
+            )
+            .exit();
+        }
+        if self.username.is_some() && self.password.is_none() {
+            cmd.error(
+                ErrorKind::InvalidValue,
+                format!("Password not provided. {}", instruction),
             )
             .exit();
         }
