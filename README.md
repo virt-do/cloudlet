@@ -15,6 +15,7 @@
   - [Run the API](#run-the-api)
   - [Send the request using the cli](#send-the-request-using-the-cli)
 - [Architecture](#architecture)
+- [Config file](#config-file)
 
 ## Prerequisites
 
@@ -66,6 +67,8 @@ EOF
 
 Make sure to update the source-code-path to the path of the source code you want to run.
 Use an absolute path.
+
+[Here](#config-file) are more informations about each field
 
 ### Start the VMM
 
@@ -122,3 +125,17 @@ sequenceDiagram
 3. When a VM starts it boots on the agent which holds another gRPC server to handle requests
 4. The agent then builds and runs the code
 5. The response is streamed back to the VMM and then to the API and finally to the CLI.
+
+## Config file
+
+table: 
+
+| Field | Description | Type |
+| --- | --- | --- |
+| workload-name | Name of the workload you wanna run | String |
+| language | Language of the source code | String enum: rust, python node |
+| action | Action to perform | String enum: prepare-and-run |
+| server.address | Address of the server (currently not used) | String |
+| server.port | Port of the server (currently not used) | Integer |
+| build.source-code-path | Path to the source code on your local machine | String |
+| build.release | Build the source code in release mode | Boolean |
