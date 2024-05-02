@@ -78,7 +78,7 @@ pub async fn shutdown(request: HttpRequest) -> impl Responder {
     match response_result {
         Ok(response) => {
             let json_response: ShutdownJsonResponse = response.into();
-            return HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap());
+            HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap())
         }
         Err(_) => {
             let json_response: ShutdownJsonResponse = ShutdownJsonResponse {
