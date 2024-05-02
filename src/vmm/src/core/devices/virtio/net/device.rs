@@ -85,13 +85,14 @@ impl Net {
         tap.set_vnet_hdr_size(VIRTIO_NET_HDR_SIZE as i32)
             .map_err(Error::Tap)?;
 
-        let bridge = Bridge::new("br0".to_string());
+        let bridge_name = "br0".to_string();
+        let bridge = Bridge::new(bridge_name.clone());
         bridge.set_addr(iface_host_addr, netmask);
         bridge.attach_link(tap.get_name().map_err(Error::Tap)?);
         bridge.set_up();
 
         // Get internet access
-        iptables_ip_masq(network, netmask);
+        iptables_ip_masq(network, netmask, bridge_name);
 
         let net = Arc::new(Mutex::new(Net {
             mem,
