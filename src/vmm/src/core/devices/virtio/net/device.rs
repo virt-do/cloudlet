@@ -1,4 +1,5 @@
-use super::bridge::host_bridge;
+use super::bridge::Bridge;
+use super::iptables::iptables_ip_masq;
 use super::queue_handler::QueueHandler;
 use super::{
     simple_handler::SimpleHandler, tuntap::tap::Tap, Error, Result, NET_DEVICE_ID,
@@ -35,6 +36,7 @@ pub struct Net {
     mem: Arc<GuestMemoryMmap>,
     pub config: Config,
     tap: Arc<Mutex<Tap>>,
+    _bridge: Bridge,
 }
 
 impl Net {
@@ -43,7 +45,8 @@ impl Net {
         mem: Arc<GuestMemoryMmap>,
         device_mgr: Arc<Mutex<IoManager>>,
         mmio_cfg: MmioConfig,
-        tap_addr: Ipv4Addr,
+        iface_host_addr: Ipv4Addr,
+        network: Ipv4Addr,
         netmask: Ipv4Addr,
         iface_guest_addr: Ipv4Addr,
         irq: u32,
@@ -75,31 +78,37 @@ impl Net {
 
         // Set offload flags to match the relevant virtio features of the device (for now,
         // statically set in the constructor.
-        let tap = open_tap(None, Some(tap_addr), Some(netmask), &mut None, None, None)
-            .map_err(Error::TunTap)?;
+        let tap = open_tap(None, None, None, &mut None, None, None).map_err(Error::TunTap)?;
 
         // The layout of the header is specified in the standard and is 12 bytes in size. We
         // should define this somewhere.
         tap.set_vnet_hdr_size(VIRTIO_NET_HDR_SIZE as i32)
             .map_err(Error::Tap)?;
 
+        let bridge = Bridge::new("br0".to_string());
+        bridge.set_addr(iface_host_addr, netmask);
+        bridge.attach_link(tap.get_name().map_err(Error::Tap)?);
+        bridge.set_up();
+
+        // Get internet access
+        iptables_ip_masq(network, netmask);
+
         let net = Arc::new(Mutex::new(Net {
             mem,
             config: cfg,
             tap: Arc::new(Mutex::new(tap.clone())),
+            _bridge: bridge,
         }));
 
         let vmmio_param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone())
             .map_err(Error::Virtio)?;
         let ip_pnp_param: String = format!(
             "ip={}::{}:{}::eth0:off",
-            iface_guest_addr, tap_addr, netmask
+            iface_guest_addr, iface_host_addr, netmask
         );
 
         cmdline_extra_parameters.push(vmmio_param);
         cmdline_extra_parameters.push(ip_pnp_param);
-
-        host_bridge(tap.get_name().map_err(Error::Tap)?, "br0".to_string());
 
         Ok(net)
     }

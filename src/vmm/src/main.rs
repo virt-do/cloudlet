@@ -42,6 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Create a new VMM
             let mut vmm = VMM::new(
                 cli_args.iface_host_addr,
+                cli_args.network,
                 cli_args.netmask,
                 cli_args.iface_guest_addr,
             )
