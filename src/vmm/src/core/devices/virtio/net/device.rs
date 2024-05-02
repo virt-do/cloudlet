@@ -1,3 +1,4 @@
+use super::bridge::host_bridge;
 use super::queue_handler::QueueHandler;
 use super::{
     simple_handler::SimpleHandler, tuntap::tap::Tap, Error, Result, NET_DEVICE_ID,
@@ -85,7 +86,7 @@ impl Net {
         let net = Arc::new(Mutex::new(Net {
             mem,
             config: cfg,
-            tap: Arc::new(Mutex::new(tap)),
+            tap: Arc::new(Mutex::new(tap.clone())),
         }));
 
         let vmmio_param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone())
@@ -97,6 +98,8 @@ impl Net {
 
         cmdline_extra_parameters.push(vmmio_param);
         cmdline_extra_parameters.push(ip_pnp_param);
+
+        host_bridge(tap.get_name().map_err(Error::Tap)?, "br0".to_string());
 
         Ok(net)
     }

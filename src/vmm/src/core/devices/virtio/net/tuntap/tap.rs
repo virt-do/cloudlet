@@ -200,6 +200,11 @@ impl Tap {
         unsafe { Self::ioctl_with_ref(&sock, net_gen::sockios::SIOCSIFHWADDR as c_ulong, &ifreq) }
     }
 
+    /// Get tap name
+    pub fn get_name(&self) -> Result<String> {
+        Ok(String::from_utf8(self.if_name.clone()).map_err(|_| Error::InvalidIfname)?)
+    }
+
     /// Get mac addr for tap interface.
     pub fn get_mac_addr(&self) -> Result<MacAddr> {
         let sock = create_unix_socket().map_err(Error::NetUtil)?;

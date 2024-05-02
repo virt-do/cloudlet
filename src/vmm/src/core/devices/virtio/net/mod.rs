@@ -1,3 +1,4 @@
+mod bridge;
 pub mod device;
 mod queue_handler;
 mod simple_handler;
