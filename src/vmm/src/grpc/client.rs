@@ -1,7 +1,7 @@
 use self::agent::{workload_runner_client::WorkloadRunnerClient, ExecuteRequest, SignalRequest};
 use log::error;
 use std::{error::Error, net::Ipv4Addr, time::Duration};
-use tonic::{transport::Channel, IntoRequest, Streaming};
+use tonic::{transport::Channel, Streaming};
 use super::server::vmmorchestrator::{ShutdownVmRequest, ShutdownVmResponse};
 
 pub mod agent {
