@@ -57,7 +57,10 @@ impl WorkloadRunner for WorkloadRunnerService {
                 nix::sys::signal::Signal::SIGTERM,
             ) {
                 Ok(_) => println!("Sent SIGTERM to child process {}", child_id),
-                Err(e) => println!("Failed to send SIGTERM to child process {}: {}", child_id, e),
+                Err(e) => println!(
+                    "Failed to send SIGTERM to child process {}: {}",
+                    child_id, e
+                ),
             }
         }
 

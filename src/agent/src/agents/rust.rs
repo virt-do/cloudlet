@@ -3,10 +3,10 @@ use crate::{workload, AgentError, AgentResult};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use std::collections::HashSet;
+use std::fs::create_dir_all;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{fs::create_dir_all};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
@@ -42,7 +42,10 @@ impl RustAgent {
 
             child_processes.lock().await.insert(child.id().unwrap());
 
-            let output = child.wait_with_output().await.expect("Failed to wait on child");
+            let output = child
+                .wait_with_output()
+                .await
+                .expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -55,8 +58,11 @@ impl RustAgent {
                 .current_dir(function_dir)
                 .spawn()
                 .expect("Failed to build function");
-            
-            let output = child.wait_with_output().await.expect("Failed to wait on child");
+
+            let output = child
+                .wait_with_output()
+                .await
+                .expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -163,7 +169,10 @@ impl Agent for RustAgent {
 
             child_processes.lock().await.insert(child.id().unwrap());
 
-            let output = child.wait_with_output().await.expect("Failed to wait on child");
+            let output = child
+                .wait_with_output()
+                .await
+                .expect("Failed to wait on child");
 
             let agent_output = AgentOutput {
                 exit_code: output.status.code().unwrap(),
