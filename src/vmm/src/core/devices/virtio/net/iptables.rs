@@ -4,7 +4,7 @@ use super::xx_netmask_width;
 
 pub fn iptables_ip_masq(network: Ipv4Addr, netmask: Ipv4Addr) {
     let prefix_len = xx_netmask_width(netmask.octets());
-    let source = format!("{}/{}", network.to_string(), prefix_len);
+    let source = format!("{}/{}", network, prefix_len);
 
     let ipt = iptables::new(false).unwrap();
     let rule = format!("-s {} ! -o br0 -j MASQUERADE", source);

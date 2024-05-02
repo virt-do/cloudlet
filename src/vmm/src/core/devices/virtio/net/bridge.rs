@@ -17,7 +17,7 @@ impl Bridge {
         tokio::spawn(connection);
 
         let br = Self { name, handle };
-        let _ = br.create_bridge_if_not_exist();
+        br.create_bridge_if_not_exist();
 
         br
     }
