@@ -1,4 +1,7 @@
-use self::vmmorchestrator::{vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest, ShutdownVmRequest, ShutdownVmResponse};
+use self::vmmorchestrator::{
+    vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest, ShutdownVmRequest,
+    ShutdownVmResponse,
+};
 use crate::grpc::client::agent::ExecuteRequest;
 use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
@@ -63,7 +66,7 @@ impl VmmServiceTrait for VmmService {
             let response = client.shutdown(request.into_inner()).await.unwrap();
 
             return Ok(Response::new(response));
-        }else if let Err(e) = grpc_client {
+        } else if let Err(e) = grpc_client {
             error!("ERROR {:?}", e);
         }
         return Err(Status::internal("Failed to shutdown the VM"));

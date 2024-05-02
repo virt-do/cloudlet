@@ -1,8 +1,8 @@
 use self::agent::{workload_runner_client::WorkloadRunnerClient, ExecuteRequest, SignalRequest};
+use super::server::vmmorchestrator::{ShutdownVmRequest, ShutdownVmResponse};
 use log::error;
 use std::{error::Error, net::Ipv4Addr, time::Duration};
 use tonic::{transport::Channel, Streaming};
-use super::server::vmmorchestrator::{ShutdownVmRequest, ShutdownVmResponse};
 
 pub mod agent {
     tonic::include_proto!("cloudlet.agent");
@@ -35,7 +35,7 @@ impl WorkloadClient {
     ) -> Result<Streaming<agent::ExecuteResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
         let response_stream = self.client.execute(request).await?.into_inner();
-        
+
         Ok(response_stream)
     }
 
@@ -51,14 +51,10 @@ impl WorkloadClient {
         if let Err(status) = response {
             let error = status.source().unwrap().source().unwrap().source().unwrap();
             if error.to_string().as_str().eq(BROKEN_PIPE_ERROR) {
-                return Ok(ShutdownVmResponse {
-                    success: true
-                });
+                return Ok(ShutdownVmResponse { success: true });
             }
         }
 
-        Ok(ShutdownVmResponse {
-            success: false
-        })
+        Ok(ShutdownVmResponse { success: false })
     }
 }

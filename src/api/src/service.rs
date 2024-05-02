@@ -72,7 +72,7 @@ pub async fn shutdown(request: HttpRequest) -> impl Responder {
 
     println!("Request: {:?}", req);
 
-    let shutdown_request = ShutdownVmRequest{};
+    let shutdown_request = ShutdownVmRequest {};
     let response_result = client.shutdown_vm(shutdown_request).await;
 
     match response_result {
@@ -81,9 +81,7 @@ pub async fn shutdown(request: HttpRequest) -> impl Responder {
             HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap())
         }
         Err(_) => {
-            let json_response: ShutdownJsonResponse = ShutdownJsonResponse {
-                success: false
-            };
+            let json_response: ShutdownJsonResponse = ShutdownJsonResponse { success: false };
             return HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap());
         }
     }
@@ -97,7 +95,7 @@ pub struct ShutdownJsonResponse {
 impl From<ShutdownVmResponse> for ShutdownJsonResponse {
     fn from(value: ShutdownVmResponse) -> Self {
         Self {
-            success: value.success
+            success: value.success,
         }
     }
 }

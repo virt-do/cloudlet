@@ -1,7 +1,9 @@
 use crate::utils::ConfigFileHandler;
 use reqwest::Client;
 use serde::Deserialize;
-use shared_models::{BuildConfig, CloudletDtoRequest, Language, ServerConfig, CloudletShutdownResponse};
+use shared_models::{
+    BuildConfig, CloudletDtoRequest, CloudletShutdownResponse, Language, ServerConfig,
+};
 use std::error::Error;
 
 #[derive(Deserialize, Debug)]
@@ -53,11 +55,13 @@ impl CloudletClient {
 
     pub async fn shutdown() -> Result<bool, ()> {
         let client = Client::new();
-        let response = client.post("http://127.0.0.1:3000/shutdown")
-            .send()
-            .await;
+        let response = client.post("http://127.0.0.1:3000/shutdown").send().await;
 
-        let shutdown_response: CloudletShutdownResponse = response.unwrap().json::<CloudletShutdownResponse>().await.unwrap();
+        let shutdown_response: CloudletShutdownResponse = response
+            .unwrap()
+            .json::<CloudletShutdownResponse>()
+            .await
+            .unwrap();
 
         Ok(shutdown_response.success)
     }

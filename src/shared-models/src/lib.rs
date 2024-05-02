@@ -41,7 +41,7 @@ pub struct CloudletDtoRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct CloudletShutdownResponse {
-    pub success: bool
+    pub success: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
