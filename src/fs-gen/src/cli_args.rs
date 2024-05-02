@@ -45,6 +45,10 @@ pub struct CliArgs {
     /// Password can also be passed via STDIN: [echo <PASSWORD> | fs-gen ... -p -]
     #[arg(short='p', long="password", default_value=None)]
     pub password: Option<MaybeStdin<String>>,
+
+    /// Allow invalid TLS certificates
+    #[arg(long="insecure", action=ArgAction::SetTrue)]
+    pub insecure: bool,
 }
 
 impl CliArgs {

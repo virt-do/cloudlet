@@ -21,15 +21,16 @@ pub(super) fn get_registry_auth_data(
     image: &Image,
 ) -> Result<Registry, ImageLoaderError> {
     let manifest_url = format!(
-        "https://{}/v2/{}/{}/manifests/{}",
+        "{}/v2/{}/{}/manifests/{}",
         image.registry, image.repository, image.name, image.tag
     );
 
-    let unauth_request = client
+    let unauth_response = client
         .get(manifest_url)
         .send()
         .with_context(|| format!("Could not send request to {}", image.registry))?;
-    let auth_header: &str = unauth_request.headers()["www-authenticate"]
+
+    let auth_header: &str = unauth_response.headers()["www-authenticate"]
         .to_str()
         .map_err(|e| ImageLoaderError::Error { source: e.into() })?;
     let auth_data: Vec<&str> = auth_header.split('"').collect();
