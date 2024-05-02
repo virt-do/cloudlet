@@ -13,7 +13,7 @@
   - [Setup](#setup)
   - [Start the VMM](#start-the-vmm)
   - [Run the API](#run-the-api)
-  - [Send the request using the cli](#send-the-request-using-the-cli)
+  - [Send the request using the CLI](#send-the-request-using-the-cli)
 - [Architecture](#architecture)
 - [Config file](#config-file)
 
@@ -95,7 +95,7 @@ cargo run --bin api
 ### Send the request using the CLI
 
 ```bash
-cargo run --bin cli run --config-path src/agent/examples/config.toml
+cargo run --bin cli -- run --config-path src/agent/examples/config.toml
 ```
 
 > [!NOTE]
