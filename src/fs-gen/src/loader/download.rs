@@ -16,6 +16,7 @@ pub(crate) fn download_image_fs(
     output_file: PathBuf,
     username: Option<String>,
     password: Option<MaybeStdin<String>>,
+    insecure: bool,
 ) -> Result<Vec<PathBuf>, ImageLoaderError> {
     info!("Downloading image...");
     let image = Image::from_str(image_name);
@@ -28,7 +29,11 @@ pub(crate) fn download_image_fs(
     );
 
     // Get download token and download manifest
-    let client = Client::new();
+    let client = Client::builder()
+        .danger_accept_invalid_certs(insecure)
+        .build()
+        .map_err(|e| ImageLoaderError::Error { source: e.into() })?;
+
     let token = &get_docker_download_token(&client, &image, username, password)?;
     let manifest = download_manifest(&client, token, &image, &image.tag)
         .map_err(|e| ImageLoaderError::Error { source: e })?;
@@ -96,7 +101,7 @@ fn download_manifest(
 ) -> Result<ManifestV2> {
     // Query Docker Hub API to get the image manifest
     let manifest_url = format!(
-        "https://{}/v2/{}/{}/manifests/{}",
+        "{}/v2/{}/{}/manifests/{}",
         image.registry, image.repository, image.name, digest
     );
 
@@ -141,7 +146,7 @@ fn download_layers(
     for layer in layers {
         let digest = &layer.digest;
         let layer_url = format!(
-            "https://{}/v2/{}/{}/blobs/{}",
+            "{}/v2/{}/{}/blobs/{}",
             image.registry, image.repository, image.name, digest
         );
 
