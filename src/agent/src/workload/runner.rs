@@ -36,9 +36,12 @@ impl Runner {
         }
     }
 
-    pub fn new_from_execute_request(execute_request: ExecuteRequest) -> Result<Self, AgentError> {
+    pub fn new_from_execute_request(
+        execute_request: ExecuteRequest,
+        child_processes: Arc<Mutex<HashSet<u32>>>,
+    ) -> Result<Self, AgentError> {
         let config = Config::new_from_execute_request(execute_request)?;
-        Ok(Self::new(config))
+        Ok(Self::new(config, child_processes))
     }
 
     pub async fn run(&self) -> AgentResult<AgentOutput> {

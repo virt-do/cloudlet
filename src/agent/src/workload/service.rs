@@ -1,6 +1,7 @@
 use super::runner::Runner;
 use crate::agent::{self, execute_response::Stage, ExecuteRequest, ExecuteResponse, SignalRequest};
 use agent::workload_runner_server::WorkloadRunner;
+use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::{process, sync::Arc};
 use tokio::sync::Mutex;
@@ -8,6 +9,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
 
 type Result<T> = std::result::Result<Response<T>, tonic::Status>;
+
+static CHILD_PROCESSES: Lazy<Arc<Mutex<HashSet<u32>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashSet::new())));
 
 pub struct WorkloadRunnerService;
 
@@ -20,7 +24,7 @@ impl WorkloadRunner for WorkloadRunnerService {
 
         let execute_request = req.into_inner();
 
-        let runner = Runner::new_from_execute_request(execute_request)
+        let runner = Runner::new_from_execute_request(execute_request, CHILD_PROCESSES.clone())
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
         let res = runner
@@ -45,7 +49,7 @@ impl WorkloadRunner for WorkloadRunnerService {
     }
 
     async fn signal(&self, _: Request<SignalRequest>) -> Result<()> {
-        let child_processes = self.child_processes.lock().await;
+        let child_processes = CHILD_PROCESSES.lock().await;
 
         for &child_id in child_processes.iter() {
             nix::sys::signal::kill(
