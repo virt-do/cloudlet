@@ -19,17 +19,20 @@
 
 ## Prerequisites
 
-Basic dependencies (with apt):
+Install the dependencies. On Debian/Ubuntu:
 
 ```bash
 apt install build-essential cmake pkg-config libssl-dev flex bison libelf-dev
 ```
 
-Others:
+Then, configure the Rust toolchain and install [Just](https://github.com/casey/just):
 
-- add rust musl target: `rustup target add x86_64-unknown-linux-musl`
-- add protoc binary: see [`github.com/protocolbuffers/protobuf`](https://github.com/protocolbuffers/protobuf)
-- [just](https://github.com/casey/just): `cargo install just`
+```bash
+rustup target add x86_64-unknown-linux-musl
+cargo install just
+```
+
+Finally, install [the protobuf compiler](https://github.com/protocolbuffers/protobuf?tab=readme-ov-file#protobuf-compiler-installation).
 
 ## Run Locally
 
@@ -65,7 +68,7 @@ release = true
 EOF
 ```
 
-Make sure to update the source-code-path to the path of the source code you want to run.
+Make sure to update the `source-code-path` to the path of the source code you want to run.
 Use an absolute path.
 
 [Here](#config-file) are more informations about each field
@@ -73,7 +76,7 @@ Use an absolute path.
 ### Start the VMM
 
 > [!WARNING]
-> Make sure to replace $CARGO_PATH with the path to your cargo binary
+> Make sure to replace `CARGO_PATH` environment variable with the path to your cargo binary
 > 
 > ```bash
 > export CARGO_PATH=$(which cargo)
@@ -89,7 +92,7 @@ sudo -E capsh --keep=1 --user=$USER --inh=cap_net_admin --addamb=cap_net_admin -
 cargo run --bin api
 ```
 
-### Send the request using the cli 
+### Send the request using the CLI
 
 ```bash
 cargo run --bin cli run --config-path src/agent/examples/config.toml
@@ -127,9 +130,6 @@ sequenceDiagram
 5. The response is streamed back to the VMM and then to the API and finally to the CLI.
 
 ## Config file
-
-table: 
-
 | Field | Description | Type |
 | --- | --- | --- |
 | workload-name | Name of the workload you wanna run | String |
