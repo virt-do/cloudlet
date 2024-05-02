@@ -87,7 +87,6 @@ pub async fn shutdown(request: HttpRequest) -> impl Responder {
             return HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap());
         }
     }
-    
 }
 
 #[derive(Debug, Serialize)]
