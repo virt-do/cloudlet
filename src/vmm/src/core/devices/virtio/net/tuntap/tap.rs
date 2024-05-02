@@ -202,7 +202,8 @@ impl Tap {
 
     /// Get tap name
     pub fn get_name(&self) -> Result<String> {
-        Ok(String::from_utf8(self.if_name.clone()).map_err(|_| Error::InvalidIfname)?)
+        let name = String::from_utf8(self.if_name.clone()).map_err(|_| Error::InvalidIfname)?;
+        Ok(name)
     }
 
     /// Get mac addr for tap interface.
