@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             vmm.configure(
                 cli_args.cpus,
                 cli_args.memory,
-                &cli_args.kernel,
+                cli_args.kernel,
                 &cli_args.initramfs,
             )
             .map_err(VmmErrors::VmmConfigure)

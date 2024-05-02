@@ -335,7 +335,7 @@ impl VMM {
         &mut self,
         num_vcpus: u8,
         mem_size_mb: u32,
-        kernel_path: &Path,
+        kernel_path: PathBuf,
         initramfs_path: &Option<PathBuf>,
     ) -> Result<()> {
         let cmdline_extra_parameters = &mut Vec::new();
@@ -346,7 +346,7 @@ impl VMM {
 
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
-            kernel_path.to_path_buf(),
+            kernel_path,
             initramfs_path.clone(),
             cmdline_extra_parameters,
         )?;

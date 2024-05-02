@@ -2,9 +2,10 @@ use self::vmmorchestrator::{
     vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest,
 };
 use crate::grpc::client::agent::ExecuteRequest;
-use crate::{VmmErrors};
+use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::ffi::{OsStr, OsString};
+use std::str::FromStr;
 use std::time::Duration;
 use std::{
     convert::From,
@@ -73,27 +74,15 @@ impl VmmService {
 
     pub fn get_initramfs(
         &self,
-        language: Language,
+        language: String,
         curr_dir: &OsStr,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define initramfs file placement
         let mut initramfs_entire_file_path = curr_dir.to_owned();
         initramfs_entire_file_path.push("/tools/rootfs/");
-
-        let image = match language {
-            Language::Rust => {
-                initramfs_entire_file_path.push("rust.img");
-                "rust:alpine"
-            }
-            Language::Python => {
-                initramfs_entire_file_path.push("python.img");
-                "python:alpine"
-            }
-            Language::Node => {
-                initramfs_entire_file_path.push("node.img");
-                "node:alpine"
-            }
-        };
+        let image = String::from_str(&format!("{}:alpine", language)).unwrap();
+        initramfs_entire_file_path.push(language);
+        initramfs_entire_file_path.push(".img");
 
         let rootfs_exists = Path::new(&initramfs_entire_file_path)
             .try_exists()
@@ -108,7 +97,7 @@ impl VmmService {
             // Execute the script using sh and capture output and error streams
             let output = Command::new("sh")
                 .arg("./tools/rootfs/mkrootfs.sh")
-                .arg(image)
+                .arg(&image)
                 .arg(&agent_file_name)
                 .arg(&initramfs_entire_file_path)
                 .stdout(Stdio::piped())
@@ -137,12 +126,16 @@ impl VmmService {
             //build agent
             info!("Building agent binary");
             // Execute the script using sh and capture output and error streams
-            let output = Command::new("just")
-                .arg("build-musl-agent")
+            let output = Command::new("cargo")
+                .arg("build")
+                .arg("--release")
+                .arg("--bin")
+                .arg("agent")
+                .arg("--target=x86_64-unknown-linux-musl")
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped())
                 .output()
-                .expect("Failed to execute the just build script for the agent");
+                .expect("Failed to build the agent");
 
             // Print output and error streams
             info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
@@ -192,7 +185,7 @@ impl VmmServiceTrait for VmmService {
         let language: Language =
             Language::from_i32(vmm_request.language).expect("Unknown language");
 
-        let initramfs_path = self.get_initramfs(language, curr_dir.as_os_str()).unwrap();
+        let initramfs_path = self.get_initramfs(language.as_str_name().to_lowercase(), curr_dir.as_os_str()).unwrap();
 
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
