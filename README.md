@@ -1,4 +1,3 @@
-
 <div style="text-align:center">
     <h1> Cloudlet</h1>
     <p>The almost fast FaaS</p>
@@ -11,9 +10,9 @@
 - [Prerequisites](#prerequisites)
 - [Run Locally](#run-locally)
   - [Clone the project](#clone-the-project)
-  - [Go to the project directory](#go-to-the-project-directory)
-  - [Run the API](#run-the-api)
+  - [Setup](#setup)
   - [Start the VMM](#start-the-vmm)
+  - [Run the API](#run-the-api)
   - [Send the request using the cli](#send-the-request-using-the-cli)
 - [Architecture](#architecture)
 
@@ -36,18 +35,21 @@ Others:
 ### Clone the project
 
 ```bash
-  git clone https://github.com/virt-do/cloudlet
+git clone https://github.com/virt-do/cloudlet
 ```
 
-### Go to the project directory
+### Setup
+
+Go to the project directory:
 
 ```bash
-  cd cloudlet
+cd cloudlet
 ```
 
-Create a toml config file or update the [existing one](./src/agent/examples/config.toml)
+Create a TOML config file or update the [existing one](./src/agent/examples/config.toml):
 
-```toml
+```bash
+cat << EOF > src/agent/examples/config.toml
 workload-name = "fibonacci"
 language = "rust"
 action = "prepare-and-run"
@@ -57,37 +59,42 @@ address = "localhost"
 port = 50051
 
 [build]
-source-code-path = "CHANGE/cloudlet/src/agent/examples/main.rs"
+source-code-path = "$(readlink -f ./src/agent/examples/main.rs)"
 release = true
+EOF
 ```
 
-Here make sure to update the source-code-path to the path of the source code you want to run. Use an absolute path.
-
-
-### Run the API
-```bash
-  cargo run --bin api
-```
+Make sure to update the source-code-path to the path of the source code you want to run.
+Use an absolute path.
 
 ### Start the VMM
 
-```bash
-  sudo -E capsh --keep=1 --user=$USER --inh=cap_net_admin --addamb=cap_net_admin -- -c  'RUST_BACKTRACE=1 '$CARGO_PATH' run --bin vmm -- grpc'
-``` 
+> [!WARNING]
+> Make sure to replace $CARGO_PATH with the path to your cargo binary
+> 
+> ```bash
+> export CARGO_PATH=$(which cargo)
+> ```
 
-⚠️ Make sure to replace $CARGO_PATH with the path to your cargo binary
+```bash
+sudo -E capsh --keep=1 --user=$USER --inh=cap_net_admin --addamb=cap_net_admin -- -c  'RUST_BACKTRACE=1 '$CARGO_PATH' run --bin vmm -- grpc'
+```
+
+### Run the API
 
 ```bash
-  export CARGO_PATH=$(which cargo)
+cargo run --bin api
 ```
 
 ### Send the request using the cli 
 
 ```bash
-  cargo run --bin cli run --config-path src/agent/examples/config.toml
+cargo run --bin cli run --config-path src/agent/examples/config.toml
 ```
 
-> Note: If it's your first time running the request cloudlet will have to compile a kernel and an initramfs image. This will take a while so make sure you do something else while you wait ...
+> [!NOTE]
+> If it's your first time running the request, `cloudlet` will have to compile a kernel and an initramfs image.
+> This will take a while, so make sure you do something else while you wait...
 
 ## Architecture
 
