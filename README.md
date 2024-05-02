@@ -8,6 +8,7 @@
 ## Table of Contents
 
 - [Table of Contents](#table-of-contents)
+- [Prerequisites](#prerequisites)
 - [Run Locally](#run-locally)
   - [Clone the project](#clone-the-project)
   - [Go to the project directory](#go-to-the-project-directory)
@@ -16,6 +17,19 @@
   - [Send the request using the cli](#send-the-request-using-the-cli)
 - [Architecture](#architecture)
 
+## Prerequisites
+
+Basic dependencies (with apt):
+
+```bash
+apt install build-essential cmake pkg-config libssl-dev flex bison libelf-dev
+```
+
+Others:
+
+- add rust musl target: `rustup target add x86_64-unknown-linux-musl`
+- add protoc binary: see [`github.com/protocolbuffers/protobuf`](https://github.com/protocolbuffers/protobuf)
+- [just](https://github.com/casey/just): `cargo install just`
 
 ## Run Locally
 
