@@ -1,4 +1,6 @@
+mod bridge;
 pub mod device;
+pub mod iptables;
 mod queue_handler;
 mod simple_handler;
 pub mod tuntap;
@@ -20,3 +22,7 @@ pub enum Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub fn xx_netmask_width<const SZ: usize>(netmask: [u8; SZ]) -> u8 {
+    netmask.iter().map(|x| x.count_ones() as u8).sum()
+}
