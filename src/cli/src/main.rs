@@ -29,6 +29,16 @@ async fn main() -> io::Result<()> {
                 Ok(_) => println!("Request successful {:?}", response),
                 Err(e) => eprintln!("Error while making the request: {}", e),
             }
+        },
+        Commands::Shutdown {} => {
+            let response = CloudletClient::shutdown().await;
+            match response {
+                Ok(bool) => {
+                    if bool { println!("Shutdown Request successful !")}
+                    else { println!("Shutdown Request Failed")}
+                },
+                Err(()) => println!("Cannot send shutdown Request"),
+            }
         }
     }
 
