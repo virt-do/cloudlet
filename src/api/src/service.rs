@@ -82,7 +82,7 @@ pub async fn shutdown(request: HttpRequest) -> impl Responder {
         }
         Err(_) => {
             let json_response: ShutdownJsonResponse = ShutdownJsonResponse { success: false };
-            return HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap());
+            HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap())
         }
     }
 }
