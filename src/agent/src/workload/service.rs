@@ -52,11 +52,13 @@ impl WorkloadRunner for WorkloadRunnerService {
         let child_processes = CHILD_PROCESSES.lock().await;
 
         for &child_id in child_processes.iter() {
-            nix::sys::signal::kill(
+            match nix::sys::signal::kill(
                 nix::unistd::Pid::from_raw(child_id as i32),
                 nix::sys::signal::Signal::SIGTERM,
-            )
-            .unwrap();
+            ) {
+                Ok(_) => println!("Sent SIGTERM to child process {}", child_id),
+                Err(e) => println!("Failed to send SIGTERM to child process {}: {}", child_id, e),
+            }
         }
 
         process::exit(0);

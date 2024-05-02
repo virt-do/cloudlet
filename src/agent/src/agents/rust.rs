@@ -6,7 +6,8 @@ use std::collections::HashSet;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::{fs::create_dir_all, process::Command};
+use std::{fs::create_dir_all};
+use tokio::process::Command;
 use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
@@ -39,9 +40,9 @@ impl RustAgent {
                 .spawn()
                 .expect("Failed to build function");
 
-            child_processes.lock().await.insert(child.id());
+            child_processes.lock().await.insert(child.id().unwrap());
 
-            let output = child.wait_with_output().expect("Failed to wait on child");
+            let output = child.wait_with_output().await.expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -49,11 +50,13 @@ impl RustAgent {
                 stderr: std::str::from_utf8(&output.stderr).unwrap().to_string(),
             })
         } else {
-            let output = Command::new("cargo")
+            let child = Command::new("cargo")
                 .arg("build")
                 .current_dir(function_dir)
-                .output()
+                .spawn()
                 .expect("Failed to build function");
+            
+            let output = child.wait_with_output().await.expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -158,9 +161,9 @@ impl Agent for RustAgent {
                 .spawn()
                 .expect("Failed to run function");
 
-            child_processes.lock().await.insert(child.id());
+            child_processes.lock().await.insert(child.id().unwrap());
 
-            let output = child.wait_with_output().expect("Failed to wait on child");
+            let output = child.wait_with_output().await.expect("Failed to wait on child");
 
             let agent_output = AgentOutput {
                 exit_code: output.status.code().unwrap(),
