@@ -12,8 +12,8 @@ run:
   sudo -E capsh --keep=1 --user=$USER --inh=cap_net_admin --addamb=cap_net_admin -- -c \
     'RUST_BACKTRACE=1 '$CARGO_PATH' run --bin vmm -- cli --memory 512 --cpus 1 \
     --kernel tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin \
-    --iface-host-addr 172.29.0.1 --netmask 255.255.0.0 --network 172.29.0.0 --iface-guest-addr 172.29.0.2 \
-    --initramfs=tools/rootfs/initramfs.img'
+    --iface-host-addr 172.29.0.1 --netmask 255.255.0.0 --iface-guest-addr 172.29.0.2 \
+    --initramfs=../virt-do/initramfs.img'
 
 build-kernel:
   #!/bin/bash

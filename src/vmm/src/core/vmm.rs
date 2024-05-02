@@ -59,7 +59,6 @@ pub struct VMM {
     vcpus: Vec<Vcpu>,
 
     iface_host_addr: Ipv4Addr,
-    network: Ipv4Addr,
     netmask: Ipv4Addr,
     iface_guest_addr: Ipv4Addr,
     net_devices: Vec<Arc<Mutex<Net>>>,
@@ -72,7 +71,6 @@ impl VMM {
     /// Create a new VMM.
     pub fn new(
         iface_host_addr: Ipv4Addr,
-        network: Ipv4Addr,
         netmask: Ipv4Addr,
         iface_guest_addr: Ipv4Addr,
     ) -> Result<Self> {
@@ -118,7 +116,6 @@ impl VMM {
             slip_pty: Arc::new(Mutex::new(slip_pty)),
             epoll,
             iface_host_addr,
-            network,
             netmask,
             iface_guest_addr,
             net_devices: Vec::new(),
@@ -390,7 +387,6 @@ impl VMM {
             self.device_mgr.clone(),
             mmio_cfg,
             self.iface_host_addr,
-            self.network,
             self.netmask,
             self.iface_guest_addr,
             irq,

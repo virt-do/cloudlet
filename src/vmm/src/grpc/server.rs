@@ -51,7 +51,6 @@ impl VmmServiceTrait for VmmService {
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
-        const NETWORK: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 0);
         const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
         // get current directory
@@ -158,8 +157,7 @@ impl VmmServiceTrait for VmmService {
         }
         let initramfs_path = PathBuf::from(&initramfs_entire_file_path);
 
-        let mut vmm =
-            VMM::new(HOST_IP, NETWORK, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
+        let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
         // Configure the VMM parameters might need to be calculated rather than hardcoded
         vmm.configure(1, 4000, kernel_path, &Some(initramfs_path))

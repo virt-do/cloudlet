@@ -46,7 +46,6 @@ impl Net {
         device_mgr: Arc<Mutex<IoManager>>,
         mmio_cfg: MmioConfig,
         iface_host_addr: Ipv4Addr,
-        network: Ipv4Addr,
         netmask: Ipv4Addr,
         iface_guest_addr: Ipv4Addr,
         irq: u32,
@@ -92,7 +91,7 @@ impl Net {
         bridge.set_up();
 
         // Get internet access
-        iptables_ip_masq(network, netmask, bridge_name);
+        iptables_ip_masq(iface_host_addr & netmask, netmask, bridge_name);
 
         let net = Arc::new(Mutex::new(Net {
             mem,
@@ -104,7 +103,7 @@ impl Net {
         let vmmio_param = register_mmio_device(mmio_cfg, device_mgr, irq, None, net.clone())
             .map_err(Error::Virtio)?;
         let ip_pnp_param: String = format!(
-            "ip={}::{}:{}::eth0:off",
+            "ip={}::{}:{}::eth0:off:1.1.1.1",
             iface_guest_addr, iface_host_addr, netmask
         );
 

@@ -44,10 +44,6 @@ pub struct CliArguments {
     #[clap(long, env, required = true)]
     pub iface_host_addr: Ipv4Addr,
 
-    /// Network.
-    #[clap(long, env, required = true)]
-    pub network: Ipv4Addr,
-
     /// Subnet mask for network.
     #[clap(long, env, required = true)]
     pub netmask: Ipv4Addr,
