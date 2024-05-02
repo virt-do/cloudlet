@@ -27,6 +27,7 @@ fn run(args: CliArgs) -> Result<()> {
         layers_subdir,
         args.username,
         args.password,
+        args.insecure,
     ) {
         Err(e) => bail!(e),
         Ok(e) => e,
