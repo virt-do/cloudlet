@@ -50,10 +50,10 @@ Go to the project directory:
 cd cloudlet
 ```
 
-Create a TOML config file or update the [existing one](./src/agent/examples/config.toml):
+Create a TOML config file or update the [existing one](./src/cli/examples/config.toml):
 
 ```bash
-cat << EOF > src/agent/examples/config.toml
+cat << EOF > src/cli/examples/config.toml
 workload-name = "fibonacci"
 language = "rust"
 action = "prepare-and-run"
@@ -63,7 +63,7 @@ address = "localhost"
 port = 50051
 
 [build]
-source-code-path = "$(readlink -f ./src/agent/examples/main.rs)"
+source-code-path = "$(readlink -f ./src/cli/examples/main.rs)"
 release = true
 EOF
 ```
@@ -95,7 +95,7 @@ cargo run --bin api
 ### Send the request using the CLI
 
 ```bash
-cargo run --bin cli -- run --config-path src/agent/examples/config.toml
+cargo run --bin cli -- run --config-path src/cli/examples/config.toml
 ```
 
 > [!NOTE]
