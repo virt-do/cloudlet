@@ -61,7 +61,7 @@ pub fn generate_initramfs(root_directory: &Path, output: &Path) -> Result<()> {
         .current_dir(root_directory)
         .stdout(Stdio::from(file))
         .arg("-c")
-        .arg("find . -print0 | cpio -0 --create --owner=root:root --format=newc | xz -9 --format=lzma")
+        .arg("find . -print0 | cpio -0 --create --owner=root:root --format=newc | xz -9 -T0 --format=lzma")
         .spawn()
         .with_context(|| "Failed to package initramfs into bundle".to_string())?;
 
