@@ -98,6 +98,8 @@ cargo run --bin cli run --config-path src/agent/examples/config.toml
 
 ## Architecture
 
+Here is a simple sequence diagram of Cloudlet:
+
 ```mermaid
 sequenceDiagram
     participant CLI
@@ -114,4 +116,9 @@ sequenceDiagram
     VMM-->>API: Stream Response
     API-->>CLI: HTTP Response
 ```
-Here is a simple sequence diagram of the architecture of Cloudlet. The CLI sends an HTTP request to the API which in turn sends a gRPC request to the VMM. The VMM then creates a VM. When a VM starts it boots on the agent which holds another gRPC server to handle requests. The agent then builds and runs the code. The response is streamed back to the VMM and then to the API and finally to the CLI.
+
+1. The CLI sends an HTTP request to the API which in turn sends a gRPC request to the VMM
+2. The VMM then creates a VM
+3. When a VM starts it boots on the agent which holds another gRPC server to handle requests
+4. The agent then builds and runs the code
+5. The response is streamed back to the VMM and then to the API and finally to the CLI.
