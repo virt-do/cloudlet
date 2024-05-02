@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use tonic::{transport::Channel, Streaming};
 use vmmorchestrator::vmm_service_client::VmmServiceClient;
 
@@ -26,5 +28,18 @@ impl VmmClient {
         let response_stream = self.client.run(request).await?.into_inner();
 
         Ok(response_stream)
+    }
+
+    pub async fn shutdown_vm(
+        &mut self,
+        request: vmmorchestrator::ShutdownVmRequest,
+    ) -> Result<vmmorchestrator::ShutdownVmResponse, tonic::Status> {
+        let mut request = tonic::Request::new(request);
+        request.set_timeout(Duration::from_secs(5));
+        let response = self.client.shutdown(request).await?.into_inner();
+
+        println!("shutdown response: {:?}", response);
+
+        Ok(response)
     }
 }

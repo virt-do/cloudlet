@@ -32,6 +32,7 @@ message ExecuteResponse {
 }
 
 service VmmService {
+  rpc Shutdown (ShutdownVmRequest) returns (ShutdownVmResponse) {};
   rpc Run (RunVmmRequest) returns (stream ExecuteResponse) {};
 }
 
@@ -44,4 +45,11 @@ message RunVmmRequest {
 }
 
 message RunVmmResponse {
+}
+
+message ShutdownVmRequest {
+}
+
+message ShutdownVmResponse {
+  bool success = 1;
 }

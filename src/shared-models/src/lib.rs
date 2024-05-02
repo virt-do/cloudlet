@@ -39,6 +39,11 @@ pub struct CloudletDtoRequest {
     pub build: BuildConfig,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CloudletShutdownResponse {
+    pub success: bool
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ServerConfig {
     pub address: String,

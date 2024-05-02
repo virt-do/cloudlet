@@ -1,6 +1,4 @@
-use self::vmmorchestrator::{
-    vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest,
-};
+use self::vmmorchestrator::{vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest, ShutdownVmRequest, ShutdownVmResponse};
 use crate::grpc::client::agent::ExecuteRequest;
 use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
@@ -45,6 +43,31 @@ pub struct VmmService;
 impl VmmServiceTrait for VmmService {
     type RunStream =
         ReceiverStream<std::result::Result<vmmorchestrator::ExecuteResponse, tonic::Status>>;
+
+    async fn shutdown(&self, request: Request<ShutdownVmRequest>) -> Result<ShutdownVmResponse> {
+        const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
+
+        let grpc_client = tokio::spawn(async move {
+            // Wait 2 seconds
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            println!("Connecting to Agent service");
+
+            WorkloadClient::new(GUEST_IP, 50051).await
+        })
+        .await
+        .unwrap();
+
+        if let Ok(mut client) = grpc_client {
+            info!("Attempting to shutdown the VM...");
+
+            let response = client.shutdown(request.into_inner()).await.unwrap();
+
+            return Ok(Response::new(response));
+        }else if let Err(e) = grpc_client {
+            error!("ERROR {:?}", e);
+        }
+        return Err(Status::internal("Failed to shutdown the VM"));
+    }
 
     async fn run(&self, request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
         let (tx, rx) = tokio::sync::mpsc::channel(4);
