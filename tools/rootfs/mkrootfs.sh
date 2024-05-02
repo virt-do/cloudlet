@@ -7,7 +7,7 @@ then
 fi
 
 # augment the open file limit
-ulimit -Sn 8192
+ulimit -Sn $(ulimit -Hn)
 
 if [ -d fs-gen ]
 then

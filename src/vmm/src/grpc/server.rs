@@ -2,8 +2,9 @@ use self::vmmorchestrator::{
     vmm_service_server::VmmService as VmmServiceTrait, Language, RunVmmRequest,
 };
 use crate::grpc::client::agent::ExecuteRequest;
-use crate::VmmErrors;
+use crate::{VmmErrors};
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
+use std::ffi::{OsStr, OsString};
 use std::time::Duration;
 use std::{
     convert::From,
@@ -41,31 +42,17 @@ impl From<VmmErrors> for Status {
 #[derive(Default)]
 pub struct VmmService;
 
-#[tonic::async_trait]
-impl VmmServiceTrait for VmmService {
-    type RunStream =
-        ReceiverStream<std::result::Result<vmmorchestrator::ExecuteResponse, tonic::Status>>;
-
-    async fn run(&self, request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
-        let (tx, rx) = tokio::sync::mpsc::channel(4);
-
-        const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
-        const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
-        const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
-
-        // get current directory
-        let mut curr_dir =
-            current_dir().expect("Need to be able to access current directory path.");
-
+impl VmmService {
+    pub fn get_kernel(&self, curr_dir: &OsStr) -> std::result::Result<PathBuf, VmmErrors> {
         // define kernel path
-        let mut kernel_entire_path = curr_dir.as_os_str().to_owned();
+        let mut kernel_entire_path = curr_dir.to_owned();
         kernel_entire_path
             .push("/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
 
         // Check if the kernel is on the system, else build it
         let kernel_exists = Path::new(&kernel_entire_path)
             .try_exists()
-            .unwrap_or_else(|_| panic!("Could not access folder {:?}", &kernel_entire_path));
+            .expect("Unable to read directory");
 
         if !kernel_exists {
             info!("Kernel not found, building kernel");
@@ -81,16 +68,17 @@ impl VmmServiceTrait for VmmService {
             info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
             error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
         };
-        let kernel_path = Path::new(&kernel_entire_path);
+        Ok(PathBuf::from(&kernel_entire_path))
+    }
 
+    pub fn get_initramfs(
+        &self,
+        language: Language,
+        curr_dir: &OsStr,
+    ) -> std::result::Result<PathBuf, VmmErrors> {
         // define initramfs file placement
-        let mut initramfs_entire_file_path = curr_dir.as_os_str().to_owned();
+        let mut initramfs_entire_file_path = curr_dir.to_owned();
         initramfs_entire_file_path.push("/tools/rootfs/");
-
-        // get request with the language
-        let vmm_request = request.into_inner();
-        let language: Language =
-            Language::from_i32(vmm_request.language).expect("Unknown language");
 
         let image = match language {
             Language::Rust => {
@@ -113,31 +101,9 @@ impl VmmServiceTrait for VmmService {
                 panic!("Could not access folder {:?}", &initramfs_entire_file_path)
             });
         if !rootfs_exists {
-            // check if agent binary exists
-            let agent_file_name = curr_dir.as_mut_os_string();
-            agent_file_name.push("/target/x86_64-unknown-linux-musl/release/agent");
-
-            // if agent hasn't been build, build it
-            let agent_exists = Path::new(&agent_file_name)
-                .try_exists()
-                .unwrap_or_else(|_| panic!("Could not access folder {:?}", &agent_file_name));
-            if !agent_exists {
-                //build agent
-                info!("Building agent binary");
-                // Execute the script using sh and capture output and error streams
-                let output = Command::new("just")
-                    .arg("build-musl-agent")
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .output()
-                    .expect("Failed to execute the just build script for the agent");
-
-                // Print output and error streams
-                info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
-                error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
-                info!("Agent binary successfully built.")
-            }
-
+            // build the agent
+            let agent_file_name = self.build_agent(curr_dir).unwrap();
+            // build initramfs
             info!("Building initramfs");
             // Execute the script using sh and capture output and error streams
             let output = Command::new("sh")
@@ -155,7 +121,78 @@ impl VmmServiceTrait for VmmService {
             error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
             info!("Initramfs successfully built.")
         }
-        let initramfs_path = PathBuf::from(&initramfs_entire_file_path);
+        Ok(PathBuf::from(&initramfs_entire_file_path))
+    }
+
+    pub fn build_agent(&self, curr_dir: &OsStr) -> std::result::Result<OsString, ()> {
+        // check if agent binary exists
+        let mut agent_file_name = curr_dir.to_owned();
+        agent_file_name.push("/target/x86_64-unknown-linux-musl/release/agent");
+
+        // if agent hasn't been build, build it
+        let agent_exists = Path::new(&agent_file_name)
+            .try_exists()
+            .unwrap_or_else(|_| panic!("Could not access folder {:?}", &agent_file_name));
+        if !agent_exists {
+            //build agent
+            info!("Building agent binary");
+            // Execute the script using sh and capture output and error streams
+            let output = Command::new("just")
+                .arg("build-musl-agent")
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .expect("Failed to execute the just build script for the agent");
+
+            // Print output and error streams
+            info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
+            error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
+            info!("Agent binary successfully built.")
+        }
+        Ok(agent_file_name)
+    }
+
+    pub fn get_agent_request(&self, vmm_request: RunVmmRequest) -> ExecuteRequest {
+        // Send the grpc request to start the agent
+        let agent_request = ExecuteRequest {
+            workload_name: vmm_request.workload_name,
+            language: match vmm_request.language {
+                0 => "rust".to_string(),
+                1 => "python".to_string(),
+                2 => "node".to_string(),
+                _ => unreachable!("Invalid language"),
+            },
+            action: 2, // Prepare and run
+            code: vmm_request.code,
+            config_str: "[build]\nrelease = true".to_string(),
+        };
+        agent_request
+    }
+}
+
+#[tonic::async_trait]
+impl VmmServiceTrait for VmmService {
+    type RunStream =
+        ReceiverStream<std::result::Result<vmmorchestrator::ExecuteResponse, tonic::Status>>;
+
+    async fn run(&self, request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
+
+        const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
+        const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
+        const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
+
+        // get current directory
+        let curr_dir = current_dir().expect("Need to be able to access current directory path.");
+
+        let kernel_path = self.get_kernel(curr_dir.as_os_str()).unwrap();
+
+        // get request with the language
+        let vmm_request = request.into_inner();
+        let language: Language =
+            Language::from_i32(vmm_request.language).expect("Unknown language");
+
+        let initramfs_path = self.get_initramfs(language, curr_dir.as_os_str()).unwrap();
 
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
@@ -171,6 +208,7 @@ impl VmmServiceTrait for VmmService {
             }
         });
 
+        // run the grpc client
         let grpc_client = tokio::spawn(async move {
             // Wait 2 seconds
             tokio::time::sleep(Duration::from_secs(2)).await;
@@ -181,19 +219,7 @@ impl VmmServiceTrait for VmmService {
         .await
         .unwrap();
 
-        // Send the grpc request to start the agent
-        let agent_request = ExecuteRequest {
-            workload_name: vmm_request.workload_name,
-            language: match vmm_request.language {
-                0 => "rust".to_string(),
-                1 => "python".to_string(),
-                2 => "node".to_string(),
-                _ => unreachable!("Invalid language"),
-            },
-            action: 2, // Prepare and run
-            code: vmm_request.code,
-            config_str: "[build]\nrelease = true".to_string(),
-        };
+        let agent_request = self.get_agent_request(vmm_request);
 
         match grpc_client {
             Ok(mut client) => {
