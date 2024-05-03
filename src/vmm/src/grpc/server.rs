@@ -52,8 +52,8 @@ impl VmmService {
         curr_dir: &OsStr,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define initramfs file placement
-        let initramfs_entire_file_path = &format!("{:?}/tools/rootfs/{language}.img", curr_dir);
-
+        let mut initramfs_entire_file_path = curr_dir.to_os_string();
+        initramfs_entire_file_path.push(&format!("/tools/rootfs/{language}.img"));
         // set image name
         let image = format!("{language}:alpine");
 
@@ -83,12 +83,11 @@ impl VmmService {
                     vec![
                         "./tools/rootfs/mkrootfs.sh",
                         &image,
-                        &format!("{:?}", agent_file_name),
-                        &initramfs_entire_file_path,
+                        &agent_file_name.to_str().unwrap(),
+                        &initramfs_entire_file_path.to_str().unwrap(),
                     ],
                 )
                 .map_err(VmmErrors::VmmBuildEnvironment);
-            info!("Initramfs successfully built.")
         }
         Ok(PathBuf::from(&initramfs_entire_file_path))
     }
@@ -116,7 +115,8 @@ impl VmmService {
         args: Vec<&str>,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define file path
-        let entire_path = &format!("{:?}/tools/rootfs/{end_path}.img", curr_dir);
+        let mut entire_path = curr_dir.to_os_string();
+        entire_path.push(&end_path);
 
         // Check if the file is on the system, else build it
         let exists = Path::new(&entire_path)
@@ -124,17 +124,16 @@ impl VmmService {
             .map_err(VmmErrors::VmmBuildEnvironment)?;
 
         if !exists {
-            // we know that the filepath is valid and has more than 1 / in it so we can unwrap
             info!(
                 "File {:?} not found, building it",
-                &entire_path.split('/').last().unwrap()
+                &entire_path
             );
             let _ = self
                 .run_command(command_type, args)
                 .map_err(VmmErrors::VmmBuildEnvironment);
             info!(
                 "File {:?} successfully build",
-                &entire_path.split('/').last().unwrap()
+                &entire_path
             );
         };
         Ok(PathBuf::from(&entire_path))
@@ -208,7 +207,7 @@ impl VmmServiceTrait for VmmService {
         let grpc_client = tokio::spawn(async move {
             // Wait 2 seconds
             tokio::time::sleep(Duration::from_secs(2)).await;
-            println!("Connecting to Agent service");
+            info!("Connecting to Agent service");
 
             WorkloadClient::new(GUEST_IP, 50051).await
         })
