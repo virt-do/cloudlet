@@ -1,8 +1,13 @@
 use super::{Agent, AgentOutput};
 use crate::{workload, AgentError, AgentResult};
+use async_trait::async_trait;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
-use std::{fs::create_dir_all, process::Command};
+use std::collections::HashSet;
+use std::fs::create_dir_all;
+use std::sync::Arc;
+use tokio::process::Command;
+use tokio::sync::Mutex;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -21,14 +26,27 @@ pub struct RustAgent {
 }
 
 impl RustAgent {
-    fn build(&self, function_dir: &String) -> AgentResult<AgentOutput> {
+    async fn build(
+        &self,
+        function_dir: &str,
+        child_processes: Arc<Mutex<HashSet<u32>>>,
+    ) -> AgentResult<AgentOutput> {
         if self.rust_config.build.release {
-            let output = Command::new("cargo")
+            let child = Command::new("cargo")
                 .arg("build")
                 .arg("--release")
                 .current_dir(function_dir)
-                .output()
+                .spawn()
                 .expect("Failed to build function");
+
+            {
+                child_processes.lock().await.insert(child.id().unwrap());
+            }
+
+            let output = child
+                .wait_with_output()
+                .await
+                .expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -36,11 +54,16 @@ impl RustAgent {
                 stderr: std::str::from_utf8(&output.stderr).unwrap().to_string(),
             })
         } else {
-            let output = Command::new("cargo")
+            let child = Command::new("cargo")
                 .arg("build")
                 .current_dir(function_dir)
-                .output()
+                .spawn()
                 .expect("Failed to build function");
+
+            let output = child
+                .wait_with_output()
+                .await
+                .expect("Failed to wait on child");
 
             Ok(AgentOutput {
                 exit_code: output.status.code().unwrap(),
@@ -63,8 +86,9 @@ impl From<workload::config::Config> for RustAgent {
     }
 }
 
+#[async_trait]
 impl Agent for RustAgent {
-    fn prepare(&self) -> AgentResult<AgentOutput> {
+    async fn prepare(&self, child_processes: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput> {
         let function_dir = format!(
             "/tmp/{}",
             Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
@@ -85,7 +109,7 @@ impl Agent for RustAgent {
             [package]
             name = "{}"
             version = "0.1.0"
-            edition = "2018"
+            edition = "2021"
         "#,
             self.workload_config.workload_name
         );
@@ -93,7 +117,7 @@ impl Agent for RustAgent {
         std::fs::write(format!("{}/Cargo.toml", &function_dir), cargo_toml)
             .expect("Unable to write Cargo.toml file");
 
-        let result = self.build(&function_dir)?;
+        let result = self.build(&function_dir, child_processes).await?;
 
         if result.exit_code != 0 {
             println!("Build failed: {:?}", result);
@@ -131,10 +155,19 @@ impl Agent for RustAgent {
         })
     }
 
-    fn run(&self) -> AgentResult<AgentOutput> {
-        let output = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
-            .output()
+    async fn run(&self, child_processes: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput> {
+        let child = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
+            .spawn()
             .expect("Failed to run function");
+
+        {
+            child_processes.lock().await.insert(child.id().unwrap());
+        }
+
+        let output = child
+            .wait_with_output()
+            .await
+            .expect("Failed to wait on child");
 
         let agent_output = AgentOutput {
             exit_code: output.status.code().unwrap(),
