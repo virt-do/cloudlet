@@ -52,11 +52,10 @@ impl VmmService {
         curr_dir: &OsStr,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define initramfs file placement
-        let initramfs_entire_file_path =
-            curr_dir.to_str().unwrap().to_owned() + &format!("/tools/rootfs/{}.img", language);
+        let initramfs_entire_file_path = &format!("{:?}/tools/rootfs/{language}.img", curr_dir);
 
         // set image name
-        let image = format!("{}:alpine", language);
+        let image = format!("{language}:alpine");
 
         // check if an initramfs already exists
         let rootfs_exists = Path::new(&initramfs_entire_file_path)
@@ -84,7 +83,7 @@ impl VmmService {
                     vec![
                         "./tools/rootfs/mkrootfs.sh",
                         &image,
-                        agent_file_name.to_str().unwrap(),
+                        &format!("{:?}", agent_file_name),
                         &initramfs_entire_file_path,
                     ],
                 )
@@ -117,7 +116,7 @@ impl VmmService {
         args: Vec<&str>,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define file path
-        let entire_path = curr_dir.to_str().unwrap().to_owned() + end_path;
+        let entire_path = &format!("{:?}/tools/rootfs/{end_path}.img", curr_dir);
 
         // Check if the file is on the system, else build it
         let exists = Path::new(&entire_path)
@@ -125,6 +124,7 @@ impl VmmService {
             .map_err(VmmErrors::VmmBuildEnvironment)?;
 
         if !exists {
+            // we know that the filepath is valid and has more than 1 / in it so we can unwrap
             info!(
                 "File {:?} not found, building it",
                 &entire_path.split('/').last().unwrap()
