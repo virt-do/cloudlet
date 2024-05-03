@@ -116,7 +116,7 @@ impl VmmService {
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define file path
         let mut entire_path = curr_dir.to_os_string();
-        entire_path.push(&end_path);
+        entire_path.push(end_path);
 
         // Check if the file is on the system, else build it
         let exists = Path::new(&entire_path)
@@ -124,17 +124,11 @@ impl VmmService {
             .map_err(VmmErrors::VmmBuildEnvironment)?;
 
         if !exists {
-            info!(
-                "File {:?} not found, building it",
-                &entire_path
-            );
+            info!("File {:?} not found, building it", &entire_path);
             let _ = self
                 .run_command(command_type, args)
                 .map_err(VmmErrors::VmmBuildEnvironment);
-            info!(
-                "File {:?} successfully build",
-                &entire_path
-            );
+            info!("File {:?} successfully build", &entire_path);
         };
         Ok(PathBuf::from(&entire_path))
     }
