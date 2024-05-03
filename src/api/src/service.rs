@@ -1,8 +1,8 @@
 use crate::client::{
-    vmmorchestrator::{ExecuteResponse, RunVmmRequest},
+    vmmorchestrator::{ExecuteResponse, RunVmmRequest, ShutdownVmRequest, ShutdownVmResponse},
     VmmClient,
 };
-use actix_web::{post, web, HttpResponse, Responder};
+use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
 use actix_web_lab::sse;
 use async_stream::stream;
 use serde::Serialize;
@@ -65,7 +65,37 @@ impl From<ExecuteResponse> for ExecuteJsonResponse {
 }
 
 #[post("/shutdown")]
-pub async fn shutdown(req_body: String) -> impl Responder {
-    // TODO: Get the id from the body and shutdown the vm
-    HttpResponse::Ok().body(req_body)
+pub async fn shutdown(request: HttpRequest) -> impl Responder {
+    let req = request;
+
+    let mut client = VmmClient::new().await.unwrap();
+
+    println!("Request: {:?}", req);
+
+    let shutdown_request = ShutdownVmRequest {};
+    let response_result = client.shutdown_vm(shutdown_request).await;
+
+    match response_result {
+        Ok(response) => {
+            let json_response: ShutdownJsonResponse = response.into();
+            HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap())
+        }
+        Err(_) => {
+            let json_response: ShutdownJsonResponse = ShutdownJsonResponse { success: false };
+            HttpResponse::Ok().body(serde_json::to_string(&json_response).unwrap())
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ShutdownJsonResponse {
+    pub success: bool,
+}
+
+impl From<ShutdownVmResponse> for ShutdownJsonResponse {
+    fn from(value: ShutdownVmResponse) -> Self {
+        Self {
+            success: value.success,
+        }
+    }
 }

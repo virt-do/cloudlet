@@ -1,6 +1,7 @@
-use self::agent::{workload_runner_client::WorkloadRunnerClient, ExecuteRequest};
+use self::agent::{workload_runner_client::WorkloadRunnerClient, ExecuteRequest, SignalRequest};
+use super::server::vmmorchestrator::{ShutdownVmRequest, ShutdownVmResponse};
 use log::error;
-use std::{net::Ipv4Addr, time::Duration};
+use std::{error::Error, net::Ipv4Addr, time::Duration};
 use tonic::{transport::Channel, Streaming};
 
 pub mod agent {
@@ -36,5 +37,24 @@ impl WorkloadClient {
         let response_stream = self.client.execute(request).await?.into_inner();
 
         Ok(response_stream)
+    }
+
+    pub async fn shutdown(
+        &mut self,
+        _request: ShutdownVmRequest,
+    ) -> Result<ShutdownVmResponse, tonic::Status> {
+        const BROKEN_PIPE_ERROR: &str = "stream closed because of a broken pipe";
+
+        let signal_request = SignalRequest::default();
+        let response = self.client.signal(signal_request).await;
+
+        if let Err(status) = response {
+            let error = status.source().unwrap().source().unwrap().source().unwrap();
+            if error.to_string().as_str().eq(BROKEN_PIPE_ERROR) {
+                return Ok(ShutdownVmResponse { success: true });
+            }
+        }
+
+        Ok(ShutdownVmResponse { success: false })
     }
 }
