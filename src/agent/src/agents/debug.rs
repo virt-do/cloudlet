@@ -1,8 +1,12 @@
 use super::AgentOutput;
 use crate::agents::Agent;
 use crate::{workload, AgentResult};
+use async_trait::async_trait;
+use std::collections::HashSet;
 use std::fs::create_dir_all;
+use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::sync::Mutex;
 
 pub struct DebugAgent {
     workload_config: workload::config::Config,
@@ -14,8 +18,9 @@ impl From<workload::config::Config> for DebugAgent {
     }
 }
 
+#[async_trait]
 impl Agent for DebugAgent {
-    fn prepare(&self) -> AgentResult<AgentOutput> {
+    async fn prepare(&self, _: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput> {
         let dir = format!("/tmp/{}", self.workload_config.workload_name);
 
         println!("Function directory: {}", dir);
@@ -39,7 +44,7 @@ impl Agent for DebugAgent {
         })
     }
 
-    fn run(&self) -> AgentResult<AgentOutput> {
+    async fn run(&self, _: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput> {
         let dir = format!("/tmp/{}", self.workload_config.workload_name);
 
         let content = std::fs::read_to_string(format!("{}/debug.txt", &dir))
