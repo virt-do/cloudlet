@@ -5,7 +5,6 @@ use crate::grpc::client::agent::ExecuteRequest;
 use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
 use std::ffi::OsStr;
-use std::str::FromStr;
 use std::time::Duration;
 use std::{
     convert::From,
@@ -53,33 +52,30 @@ impl VmmService {
         curr_dir: &OsStr,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define initramfs file placement
-        let mut initramfs_entire_file_path = curr_dir.to_owned();
-        initramfs_entire_file_path.push("/tools/rootfs/");
-        let image = String::from_str(&format!("{}:alpine", language)).unwrap();
-        initramfs_entire_file_path.push(language);
-        initramfs_entire_file_path.push(".img");
+        let initramfs_entire_file_path =
+            curr_dir.to_str().unwrap().to_owned() + &format!("/tools/rootfs/{}.img", language);
 
+        // set image name
+        let image = format!("{}:alpine", language);
+
+        // check if an initramfs already exists
         let rootfs_exists = Path::new(&initramfs_entire_file_path)
             .try_exists()
-            .unwrap_or_else(|_| {
-                panic!("Could not access folder {:?}", &initramfs_entire_file_path)
-            });
+            .map_err(VmmErrors::VmmBuildEnvironment)?;
         if !rootfs_exists {
             // build the agent
-            let agent_file_name = self
-                .get_path(
-                    curr_dir,
-                    "/target/x86_64-unknown-linux-musl/release/agent",
-                    "cargo",
-                    vec![
-                        "build",
-                        "--release",
-                        "--bin",
-                        "agent",
-                        "--target=x86_64-unknown-linux-musl",
-                    ],
-                )
-                .map_err(VmmErrors::VmmBuildEnvironment)?;
+            let agent_file_name = self.get_path(
+                curr_dir,
+                "/target/x86_64-unknown-linux-musl/release/agent",
+                "cargo",
+                vec![
+                    "build",
+                    "--release",
+                    "--bin",
+                    "agent",
+                    "--target=x86_64-unknown-linux-musl",
+                ],
+            )?;
             // build initramfs
             info!("Building initramfs");
             let _ = self
@@ -89,7 +85,7 @@ impl VmmService {
                         "./tools/rootfs/mkrootfs.sh",
                         &image,
                         agent_file_name.to_str().unwrap(),
-                        &initramfs_entire_file_path.to_str().unwrap(),
+                        &initramfs_entire_file_path,
                     ],
                 )
                 .map_err(VmmErrors::VmmBuildEnvironment);
@@ -119,27 +115,26 @@ impl VmmService {
         end_path: &str,
         command_type: &str,
         args: Vec<&str>,
-    ) -> std::result::Result<PathBuf, std::io::Error> {
+    ) -> std::result::Result<PathBuf, VmmErrors> {
         // define file path
-        let mut entire_path = curr_dir.to_owned();
-        entire_path.push(end_path);
+        let entire_path = curr_dir.to_str().unwrap().to_owned() + end_path;
 
         // Check if the file is on the system, else build it
         let exists = Path::new(&entire_path)
             .try_exists()
-            .unwrap_or_else(|_| panic!("Unable to read directory and file {:?}", &entire_path));
+            .map_err(VmmErrors::VmmBuildEnvironment)?;
 
         if !exists {
             info!(
                 "File {:?} not found, building it",
-                &entire_path.to_str().unwrap().split('/').last().unwrap()
+                &entire_path.split('/').last().unwrap()
             );
             let _ = self
                 .run_command(command_type, args)
                 .map_err(VmmErrors::VmmBuildEnvironment);
             info!(
                 "File {:?} successfully build",
-                &entire_path.to_str().unwrap().split('/').last().unwrap()
+                &entire_path.split('/').last().unwrap()
             );
         };
         Ok(PathBuf::from(&entire_path))
@@ -174,17 +169,17 @@ impl VmmServiceTrait for VmmService {
         const GUEST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 2);
 
         // get current directory
-        let curr_dir = current_dir().expect("Need to be able to access current directory path.");
+        let curr_dir = current_dir()
+            .map_err(VmmErrors::VmmBuildEnvironment)?
+            .into_os_string();
 
-        //let kernel_path = self.get_kernel(curr_dir.as_os_str()).unwrap();
-        let kernel_path: PathBuf = self
-            .get_path(
-                curr_dir.as_os_str(),
-                "/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin",
-                "sh",
-                vec!["./tools/kernel/mkkernel.sh"],
-            )
-            .unwrap();
+        // build kernel if necessary
+        let kernel_path: PathBuf = self.get_path(
+            &curr_dir,
+            "/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin",
+            "sh",
+            vec!["./tools/kernel/mkkernel.sh"],
+        )?;
 
         // get request with the language
         let vmm_request = request.into_inner();
@@ -193,7 +188,7 @@ impl VmmServiceTrait for VmmService {
             .as_str_name()
             .to_lowercase();
 
-        let initramfs_path = self.get_initramfs(&language, curr_dir.as_os_str()).unwrap();
+        let initramfs_path = self.get_initramfs(&language, curr_dir.as_os_str())?;
 
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
