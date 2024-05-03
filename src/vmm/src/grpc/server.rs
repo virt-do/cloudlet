@@ -4,7 +4,7 @@ use self::vmmorchestrator::{
 use crate::grpc::client::agent::ExecuteRequest;
 use crate::VmmErrors;
 use crate::{core::vmm::VMM, grpc::client::WorkloadClient};
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::str::FromStr;
 use std::time::Duration;
 use std::{
@@ -36,6 +36,9 @@ impl From<VmmErrors> for Status {
             VmmErrors::VmmNew(_) => Status::internal("Error creating VMM"),
             VmmErrors::VmmConfigure(_) => Status::internal("Error configuring VMM"),
             VmmErrors::VmmRun(_) => Status::internal("Error running VMM"),
+            VmmErrors::VmmBuildEnvironment(_) => {
+                Status::internal("Error while compiling the necessary files for the VMM")
+            }
         }
     }
 }
@@ -44,37 +47,9 @@ impl From<VmmErrors> for Status {
 pub struct VmmService;
 
 impl VmmService {
-    pub fn get_kernel(&self, curr_dir: &OsStr) -> std::result::Result<PathBuf, VmmErrors> {
-        // define kernel path
-        let mut kernel_entire_path = curr_dir.to_owned();
-        kernel_entire_path
-            .push("/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin");
-
-        // Check if the kernel is on the system, else build it
-        let kernel_exists = Path::new(&kernel_entire_path)
-            .try_exists()
-            .expect("Unable to read directory");
-
-        if !kernel_exists {
-            info!("Kernel not found, building kernel");
-            // Execute the script using sh and capture output and error streams
-            let output = Command::new("sh")
-                .arg("./tools/kernel/mkkernel.sh")
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .expect("Failed to execute the kernel build script");
-
-            // Print output and error streams
-            info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
-            error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
-        };
-        Ok(PathBuf::from(&kernel_entire_path))
-    }
-
     pub fn get_initramfs(
         &self,
-        language: String,
+        language: &str,
         curr_dir: &OsStr,
     ) -> std::result::Result<PathBuf, VmmErrors> {
         // define initramfs file placement
@@ -91,75 +66,98 @@ impl VmmService {
             });
         if !rootfs_exists {
             // build the agent
-            let agent_file_name = self.build_agent(curr_dir).unwrap();
+            let agent_file_name = self
+                .get_path(
+                    curr_dir,
+                    "/target/x86_64-unknown-linux-musl/release/agent",
+                    "cargo",
+                    vec![
+                        "build",
+                        "--release",
+                        "--bin",
+                        "agent",
+                        "--target=x86_64-unknown-linux-musl",
+                    ],
+                )
+                .map_err(VmmErrors::VmmBuildEnvironment)?;
             // build initramfs
             info!("Building initramfs");
-            // Execute the script using sh and capture output and error streams
-            let output = Command::new("sh")
-                .arg("./tools/rootfs/mkrootfs.sh")
-                .arg(&image)
-                .arg(&agent_file_name)
-                .arg(&initramfs_entire_file_path)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .expect("Failed to execute the initramfs build script");
-
-            // Print output and error streams
-            info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
-            error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
+            let _ = self
+                .run_command(
+                    "sh",
+                    vec![
+                        "./tools/rootfs/mkrootfs.sh",
+                        &image,
+                        agent_file_name.to_str().unwrap(),
+                        &initramfs_entire_file_path.to_str().unwrap(),
+                    ],
+                )
+                .map_err(VmmErrors::VmmBuildEnvironment);
             info!("Initramfs successfully built.")
         }
         Ok(PathBuf::from(&initramfs_entire_file_path))
     }
 
-    pub fn build_agent(&self, curr_dir: &OsStr) -> std::result::Result<OsString, ()> {
-        // check if agent binary exists
-        let mut agent_file_name = curr_dir.to_owned();
-        agent_file_name.push("/target/x86_64-unknown-linux-musl/release/agent");
-
-        // if agent hasn't been build, build it
-        let agent_exists = Path::new(&agent_file_name)
-            .try_exists()
-            .unwrap_or_else(|_| panic!("Could not access folder {:?}", &agent_file_name));
-        if !agent_exists {
-            //build agent
-            info!("Building agent binary");
-            // Execute the script using sh and capture output and error streams
-            let output = Command::new("cargo")
-                .arg("build")
-                .arg("--release")
-                .arg("--bin")
-                .arg("agent")
-                .arg("--target=x86_64-unknown-linux-musl")
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .output()
-                .expect("Failed to build the agent");
-
-            // Print output and error streams
-            info!("Script output: {}", String::from_utf8_lossy(&output.stdout));
-            error!("Script errors: {}", String::from_utf8_lossy(&output.stderr));
-            info!("Agent binary successfully built.")
-        }
-        Ok(agent_file_name)
+    pub fn run_command(
+        &self,
+        command_type: &str,
+        args: Vec<&str>,
+    ) -> std::result::Result<(), std::io::Error> {
+        // Execute the script using sh and capture output and error streams
+        Command::new(command_type)
+            .args(args)
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .output()
+            .expect("Failed to execute the script");
+        Ok(())
     }
 
-    pub fn get_agent_request(&self, vmm_request: RunVmmRequest) -> ExecuteRequest {
+    pub fn get_path(
+        &self,
+        curr_dir: &OsStr,
+        end_path: &str,
+        command_type: &str,
+        args: Vec<&str>,
+    ) -> std::result::Result<PathBuf, std::io::Error> {
+        // define file path
+        let mut entire_path = curr_dir.to_owned();
+        entire_path.push(end_path);
+
+        // Check if the file is on the system, else build it
+        let exists = Path::new(&entire_path)
+            .try_exists()
+            .unwrap_or_else(|_| panic!("Unable to read directory and file {:?}", &entire_path));
+
+        if !exists {
+            info!(
+                "File {:?} not found, building it",
+                &entire_path.to_str().unwrap().split('/').last().unwrap()
+            );
+            let _ = self
+                .run_command(command_type, args)
+                .map_err(VmmErrors::VmmBuildEnvironment);
+            info!(
+                "File {:?} successfully build",
+                &entire_path.to_str().unwrap().split('/').last().unwrap()
+            );
+        };
+        Ok(PathBuf::from(&entire_path))
+    }
+
+    pub fn get_agent_request(
+        &self,
+        vmm_request: RunVmmRequest,
+        language: String,
+    ) -> ExecuteRequest {
         // Send the grpc request to start the agent
-        let agent_request = ExecuteRequest {
+        ExecuteRequest {
             workload_name: vmm_request.workload_name,
-            language: match vmm_request.language {
-                0 => "rust".to_string(),
-                1 => "python".to_string(),
-                2 => "node".to_string(),
-                _ => unreachable!("Invalid language"),
-            },
+            language,
             action: 2, // Prepare and run
             code: vmm_request.code,
             config_str: "[build]\nrelease = true".to_string(),
-        };
-        agent_request
+        }
     }
 }
 
@@ -178,14 +176,24 @@ impl VmmServiceTrait for VmmService {
         // get current directory
         let curr_dir = current_dir().expect("Need to be able to access current directory path.");
 
-        let kernel_path = self.get_kernel(curr_dir.as_os_str()).unwrap();
+        //let kernel_path = self.get_kernel(curr_dir.as_os_str()).unwrap();
+        let kernel_path: PathBuf = self
+            .get_path(
+                curr_dir.as_os_str(),
+                "/tools/kernel/linux-cloud-hypervisor/arch/x86/boot/compressed/vmlinux.bin",
+                "sh",
+                vec!["./tools/kernel/mkkernel.sh"],
+            )
+            .unwrap();
 
         // get request with the language
         let vmm_request = request.into_inner();
-        let language: Language =
-            Language::from_i32(vmm_request.language).expect("Unknown language");
+        let language: String = Language::from_i32(vmm_request.language)
+            .expect("Unknown language")
+            .as_str_name()
+            .to_lowercase();
 
-        let initramfs_path = self.get_initramfs(language.as_str_name().to_lowercase(), curr_dir.as_os_str()).unwrap();
+        let initramfs_path = self.get_initramfs(&language, curr_dir.as_os_str()).unwrap();
 
         let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
@@ -212,7 +220,7 @@ impl VmmServiceTrait for VmmService {
         .await
         .unwrap();
 
-        let agent_request = self.get_agent_request(vmm_request);
+        let agent_request = self.get_agent_request(vmm_request, language);
 
         match grpc_client {
             Ok(mut client) => {

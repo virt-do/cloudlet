@@ -13,7 +13,7 @@ use std::io::{self, stdout, Stdout};
 use std::net::Ipv4Addr;
 use std::os::unix::io::AsRawFd;
 use std::os::unix::prelude::RawFd;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tracing::info;

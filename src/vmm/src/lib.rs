@@ -9,4 +9,5 @@ pub enum VmmErrors {
     VmmNew(core::Error),
     VmmConfigure(core::Error),
     VmmRun(core::Error),
+    VmmBuildEnvironment(std::io::Error),
 }
