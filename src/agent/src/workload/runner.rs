@@ -1,3 +1,4 @@
+use super::config::Config;
 use crate::{
     agent::ExecuteRequest,
     agents::{rust, Agent, AgentOutput, Language},
@@ -10,8 +11,6 @@ use tokio::sync::Mutex;
 
 #[cfg(feature = "debug-agent")]
 use crate::agents::debug;
-
-use super::config::Config;
 
 /// Runner for a workload.  
 /// Will execute the workload based on the inner agent (language).
@@ -46,12 +45,19 @@ impl Runner {
 
     pub async fn run(&self) -> AgentResult<AgentOutput> {
         let result = match self.config.action {
-            Action::Prepare => self.agent.prepare(&self.child_processes).await?,
-            Action::Run => self.agent.run(&self.child_processes).await?,
+            Action::Prepare => {
+                self.agent
+                    .prepare(Arc::clone(&self.child_processes))
+                    .await?
+            }
+            Action::Run => self.agent.run(Arc::clone(&self.child_processes)).await?,
             Action::PrepareAndRun => {
-                let res = self.agent.prepare(&self.child_processes).await?;
+                let res = self
+                    .agent
+                    .prepare(Arc::clone(&self.child_processes))
+                    .await?;
                 println!("Prepare result {:?}", res);
-                self.agent.run(&self.child_processes).await?
+                self.agent.run(Arc::clone(&self.child_processes)).await?
             }
         };
 

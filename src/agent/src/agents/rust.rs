@@ -1,11 +1,10 @@
 use super::{Agent, AgentOutput};
 use crate::{workload, AgentError, AgentResult};
+use async_trait::async_trait;
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::fs::create_dir_all;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use tokio::process::Command;
 use tokio::sync::Mutex;
@@ -29,8 +28,8 @@ pub struct RustAgent {
 impl RustAgent {
     async fn build(
         &self,
-        function_dir: &String,
-        child_processes: &Arc<Mutex<HashSet<u32>>>,
+        function_dir: &str,
+        child_processes: Arc<Mutex<HashSet<u32>>>,
     ) -> AgentResult<AgentOutput> {
         if self.rust_config.build.release {
             let child = Command::new("cargo")
@@ -40,7 +39,9 @@ impl RustAgent {
                 .spawn()
                 .expect("Failed to build function");
 
-            child_processes.lock().await.insert(child.id().unwrap());
+            {
+                child_processes.lock().await.insert(child.id().unwrap());
+            }
 
             let output = child
                 .wait_with_output()
@@ -85,107 +86,100 @@ impl From<workload::config::Config> for RustAgent {
     }
 }
 
+#[async_trait]
 impl Agent for RustAgent {
-    fn prepare<'a>(
-        &'a self,
-        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
-    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>> {
-        Box::pin(async {
-            let function_dir = format!(
-                "/tmp/{}",
-                Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
-            );
+    async fn prepare(&self, child_processes: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput> {
+        let function_dir = format!(
+            "/tmp/{}",
+            Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+        );
 
-            println!("Function directory: {}", function_dir);
+        println!("Function directory: {}", function_dir);
 
-            create_dir_all(format!("{}/src", &function_dir)).expect("Unable to create directory");
+        create_dir_all(format!("{}/src", &function_dir)).expect("Unable to create directory");
 
-            std::fs::write(
-                format!("{}/src/main.rs", &function_dir),
-                &self.workload_config.code,
-            )
-            .expect("Unable to write main.rs file");
+        std::fs::write(
+            format!("{}/src/main.rs", &function_dir),
+            &self.workload_config.code,
+        )
+        .expect("Unable to write main.rs file");
 
-            let cargo_toml = format!(
-                r#"
+        let cargo_toml = format!(
+            r#"
             [package]
             name = "{}"
             version = "0.1.0"
-            edition = "2018"
+            edition = "2021"
         "#,
-                self.workload_config.workload_name
-            );
+            self.workload_config.workload_name
+        );
 
-            std::fs::write(format!("{}/Cargo.toml", &function_dir), cargo_toml)
-                .expect("Unable to write Cargo.toml file");
+        std::fs::write(format!("{}/Cargo.toml", &function_dir), cargo_toml)
+            .expect("Unable to write Cargo.toml file");
 
-            let result = self.build(&function_dir, child_processes).await?;
+        let result = self.build(&function_dir, child_processes).await?;
 
-            if result.exit_code != 0 {
-                println!("Build failed: {:?}", result);
-                return Err(AgentError::BuildFailed(AgentOutput {
-                    exit_code: result.exit_code,
-                    stdout: result.stdout,
-                    stderr: result.stderr,
-                }));
-            }
-
-            // Copy the binary to /tmp, we could imagine a more complex scenario where we would put this in an artifact repository (like S3)
-            let binary_path = match self.rust_config.build.release {
-                true => format!(
-                    "{}/target/release/{}",
-                    &function_dir, self.workload_config.workload_name
-                ),
-                false => format!(
-                    "{}/target/debug/{}",
-                    &function_dir, self.workload_config.workload_name
-                ),
-            };
-
-            std::fs::copy(
-                binary_path,
-                format!("/tmp/{}", self.workload_config.workload_name),
-            )
-            .expect("Unable to copy binary");
-
-            std::fs::remove_dir_all(&function_dir).expect("Unable to remove directory");
-
-            Ok(AgentOutput {
+        if result.exit_code != 0 {
+            println!("Build failed: {:?}", result);
+            return Err(AgentError::BuildFailed(AgentOutput {
                 exit_code: result.exit_code,
-                stdout: "Build successful".to_string(),
-                stderr: "".to_string(),
-            })
+                stdout: result.stdout,
+                stderr: result.stderr,
+            }));
+        }
+
+        // Copy the binary to /tmp, we could imagine a more complex scenario where we would put this in an artifact repository (like S3)
+        let binary_path = match self.rust_config.build.release {
+            true => format!(
+                "{}/target/release/{}",
+                &function_dir, self.workload_config.workload_name
+            ),
+            false => format!(
+                "{}/target/debug/{}",
+                &function_dir, self.workload_config.workload_name
+            ),
+        };
+
+        std::fs::copy(
+            binary_path,
+            format!("/tmp/{}", self.workload_config.workload_name),
+        )
+        .expect("Unable to copy binary");
+
+        std::fs::remove_dir_all(&function_dir).expect("Unable to remove directory");
+
+        Ok(AgentOutput {
+            exit_code: result.exit_code,
+            stdout: "Build successful".to_string(),
+            stderr: "".to_string(),
         })
     }
 
-    fn run<'a>(
-        &'a self,
-        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
-    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>> {
-        Box::pin(async {
-            let child = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
-                .spawn()
-                .expect("Failed to run function");
+    async fn run(&self, child_processes: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput> {
+        let child = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
+            .spawn()
+            .expect("Failed to run function");
 
+        {
             child_processes.lock().await.insert(child.id().unwrap());
+        }
 
-            let output = child
-                .wait_with_output()
-                .await
-                .expect("Failed to wait on child");
+        let output = child
+            .wait_with_output()
+            .await
+            .expect("Failed to wait on child");
 
-            let agent_output = AgentOutput {
-                exit_code: output.status.code().unwrap(),
-                stdout: std::str::from_utf8(&output.stdout).unwrap().to_string(),
-                stderr: std::str::from_utf8(&output.stderr).unwrap().to_string(),
-            };
+        let agent_output = AgentOutput {
+            exit_code: output.status.code().unwrap(),
+            stdout: std::str::from_utf8(&output.stdout).unwrap().to_string(),
+            stderr: std::str::from_utf8(&output.stderr).unwrap().to_string(),
+        };
 
-            if !output.status.success() {
-                println!("Run failed: {:?}", agent_output);
-                return Err(AgentError::BuildFailed(agent_output));
-            }
+        if !output.status.success() {
+            println!("Run failed: {:?}", agent_output);
+            return Err(AgentError::BuildFailed(agent_output));
+        }
 
-            Ok(agent_output)
-        })
+        Ok(agent_output)
     }
 }

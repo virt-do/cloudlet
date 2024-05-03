@@ -1,8 +1,7 @@
 use crate::{AgentError, AgentResult};
+use async_trait::async_trait;
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -17,15 +16,10 @@ pub struct AgentOutput {
     pub stderr: String,
 }
 
+#[async_trait]
 pub trait Agent {
-    fn prepare<'a>(
-        &'a self,
-        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
-    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>>;
-    fn run<'a>(
-        &'a self,
-        child_processes: &'a Arc<Mutex<HashSet<u32>>>,
-    ) -> Pin<Box<dyn Future<Output = AgentResult<AgentOutput>> + Send + '_>>;
+    async fn prepare(&self, child_processes: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput>;
+    async fn run(&self, child_processes: Arc<Mutex<HashSet<u32>>>) -> AgentResult<AgentOutput>;
 }
 
 #[derive(Debug, Clone, Deserialize)]
