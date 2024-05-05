@@ -7,6 +7,7 @@ use super::{
 };
 use crate::core::devices::virtio::features::VIRTIO_F_RING_EVENT_IDX;
 use crate::core::devices::virtio::net::tuntap::open_tap::open_tap;
+use crate::core::devices::virtio::net::BRIDGE_NAME;
 use crate::core::devices::virtio::register::register_mmio_device;
 use crate::core::devices::virtio::{
     self, Config, MmioConfig, SingleFdSignalQueue, Subscriber, QUEUE_MAX_SIZE,
@@ -18,6 +19,7 @@ use std::{
     borrow::{Borrow, BorrowMut},
     sync::{Arc, Mutex},
 };
+use tracing::info;
 use virtio_bindings::{
     virtio_config::{VIRTIO_F_IN_ORDER, VIRTIO_F_VERSION_1},
     virtio_net::{
@@ -41,7 +43,7 @@ pub struct Net {
 
 impl Net {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub async fn new(
         mem: Arc<GuestMemoryMmap>,
         device_mgr: Arc<Mutex<IoManager>>,
         mmio_cfg: MmioConfig,
@@ -84,14 +86,29 @@ impl Net {
         tap.set_vnet_hdr_size(VIRTIO_NET_HDR_SIZE as i32)
             .map_err(Error::Tap)?;
 
-        let bridge_name = "br0".to_string();
-        let bridge = Bridge::new(bridge_name.clone());
-        bridge.set_addr(iface_host_addr, netmask);
-        bridge.attach_link(tap.get_name().map_err(Error::Tap)?);
-        bridge.set_up();
+        let bridge_name = BRIDGE_NAME;
+        let bridge = Bridge::new(bridge_name).await.map_err(Error::Bridge)?;
+
+        bridge
+            .set_addr(iface_host_addr, netmask)
+            .await
+            .map_err(Error::Bridge)?;
+
+        bridge
+            .attach_link(tap.get_name().map_err(Error::Tap)?)
+            .await
+            .map_err(Error::Bridge)?;
+        info!(
+            "attached link {:?} to bridge {}",
+            tap.get_name(),
+            bridge_name
+        );
+
+        bridge.set_up().await.map_err(Error::Bridge)?;
+        info!("bridge {} set UP", bridge_name);
 
         // Get internet access
-        iptables_ip_masq(iface_host_addr & netmask, netmask, bridge_name);
+        iptables_ip_masq(iface_host_addr & netmask, netmask, bridge_name.into());
 
         let net = Arc::new(Mutex::new(Net {
             mem,

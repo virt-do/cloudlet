@@ -16,7 +16,7 @@ use std::os::unix::prelude::RawFd;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tracing::info;
+use tracing::{error, info};
 use vm_allocator::{AddressAllocator, AllocPolicy};
 use vm_device::bus::{MmioAddress, MmioRange};
 use vm_device::device_manager::IoManager;
@@ -69,7 +69,7 @@ pub struct VMM {
 
 impl VMM {
     /// Create a new VMM.
-    pub fn new(
+    pub async fn new(
         iface_host_addr: Ipv4Addr,
         netmask: Ipv4Addr,
         iface_guest_addr: Ipv4Addr,
@@ -330,12 +330,13 @@ impl VMM {
             }
         }
     }
+
     /// Configure the VMM:
     /// * `num_vcpus` Number of virtual CPUs
     /// * `mem_size_mb` Memory size (in MB)
     /// * `kernel_path` Path to a Linux kernel
     /// * `initramfs_path` Path to an initramfs
-    pub fn configure(
+    pub async fn configure(
         &mut self,
         num_vcpus: u8,
         mem_size_mb: u32,
@@ -346,7 +347,7 @@ impl VMM {
 
         self.configure_memory(mem_size_mb)?;
         self.configure_allocators(mem_size_mb)?;
-        self.configure_net_device(cmdline_extra_parameters)?;
+        self.configure_net_device(cmdline_extra_parameters).await?;
 
         let kernel_load = kernel::kernel_setup(
             &self.guest_memory,
@@ -360,7 +361,7 @@ impl VMM {
         Ok(())
     }
 
-    pub fn configure_net_device(
+    pub async fn configure_net_device(
         &mut self,
         cmdline_extra_parameters: &mut Vec<String>,
     ) -> Result<()> {
@@ -382,6 +383,8 @@ impl VMM {
             gsi: irq,
         };
 
+        let remote_endpoint = { self.event_mgr.lock().unwrap().remote_endpoint() };
+
         let net = Net::new(
             mem,
             self.device_mgr.clone(),
@@ -390,11 +393,17 @@ impl VMM {
             self.netmask,
             self.iface_guest_addr,
             irq,
-            self.event_mgr.lock().unwrap().remote_endpoint(),
+            remote_endpoint,
             self.vm_fd.clone(),
             cmdline_extra_parameters,
         )
-        .map_err(|_| Error::Virtio(virtio::Error::Net))?;
+        .await
+        .map_err(|err| {
+            error!("could not configure Net device: {:?}", err);
+            // not good, the error should be propagated
+            // these error enums should be re-written...
+            Error::Virtio(virtio::Error::Net)
+        })?;
 
         self.net_devices.push(net);
 

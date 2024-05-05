@@ -1,9 +1,24 @@
-use std::net::{IpAddr, Ipv4Addr};
-
-use futures::stream::TryStreamExt;
-use rtnetlink::{new_connection, Error, Handle};
-
 use super::xx_netmask_width;
+use futures::stream::TryStreamExt;
+use rtnetlink::{new_connection, Handle};
+use std::net::{IpAddr, Ipv4Addr};
+use tracing::info;
+
+#[derive(Debug)]
+pub enum Error {
+    GetIndexByName {
+        name: String,
+        cause: rtnetlink::Error,
+    },
+    CreateBridge(rtnetlink::Error),
+    NoLinkPresent(String),
+    AddAddress(rtnetlink::Error),
+    AttachLink {
+        link_name: String,
+        cause: rtnetlink::Error,
+    },
+    SetStateAsUp(rtnetlink::Error),
+}
 
 #[derive(Clone)]
 pub struct Bridge {
@@ -12,126 +27,116 @@ pub struct Bridge {
 }
 
 impl Bridge {
-    pub fn new(name: String) -> Self {
+    pub async fn new(name: &str) -> Result<Self, Error> {
         let (connection, handle, _) = new_connection().unwrap();
         tokio::spawn(connection);
 
-        let br = Self { name, handle };
-        br.create_bridge_if_not_exist();
+        let br = Self {
+            name: name.into(),
+            handle,
+        };
+        br.create_bridge_if_not_exist().await?;
 
-        br
+        Ok(br)
     }
 
-    fn create_bridge_if_not_exist(&self) {
-        futures::executor::block_on(async {
-            let mut bridge_names = self
-                .handle
-                .link()
-                .get()
-                .match_name(self.name.clone())
-                .execute();
+    async fn get_index_by_name(&self, name: &str) -> Result<u32, Error> {
+        let option = self
+            .handle
+            .link()
+            .get()
+            .match_name(name.into())
+            .execute()
+            .try_next()
+            .await
+            .map_err(|err| Error::GetIndexByName {
+                name: name.into(),
+                cause: err,
+            })?;
 
-            let _ = match bridge_names.try_next().await {
-                Ok(_) => Ok(()),
-                Err(_) => self
-                    .handle
-                    .link()
-                    .add()
-                    .bridge(self.name.clone())
-                    .execute()
-                    .await
-                    .map_err(|_| Error::RequestFailed),
-            };
-        });
+        match option {
+            Some(a) => Ok(a.header.index),
+            None => Err(Error::NoLinkPresent(name.into())),
+        }
     }
 
-    pub fn set_addr(&self, addr: Ipv4Addr, netmask: Ipv4Addr) {
-        futures::executor::block_on(async {
-            let mut bridge_names = self
-                .handle
-                .link()
-                .get()
-                .match_name(self.name.clone())
-                .execute();
+    async fn create_bridge_if_not_exist(&self) -> Result<(), Error> {
+        let result = self.get_index_by_name(&self.name).await;
+        if result.is_ok() {
+            info!("bridge is already presents");
 
-            let bridge_index = match bridge_names.try_next().await {
-                Ok(Some(link)) => link.header.index,
-                Ok(None) => panic!(),
-                Err(_) => panic!(),
-            };
+            return Ok(());
+        }
 
-            let prefix_len = xx_netmask_width(netmask.octets());
+        info!("bridge not found, creating bridge...");
 
-            let _ = self
-                .handle
-                .address()
-                .add(bridge_index, IpAddr::V4(addr), prefix_len)
-                .execute()
-                .await
-                .map_err(|_| Error::RequestFailed);
-        });
+        self.handle
+            .clone()
+            .link()
+            .add()
+            .bridge(self.name.clone())
+            .execute()
+            .await
+            .map_err(Error::CreateBridge)
     }
 
-    pub fn set_up(&self) {
-        futures::executor::block_on(async {
-            let mut bridge_names = self
-                .handle
-                .link()
-                .get()
-                .match_name(self.name.clone())
-                .execute();
+    pub async fn set_addr(&self, addr: Ipv4Addr, netmask: Ipv4Addr) -> Result<(), Error> {
+        let bridge_index = self.get_index_by_name(&self.name).await?;
+        let prefix_len = xx_netmask_width(netmask.octets());
 
-            let bridge_index = match bridge_names.try_next().await {
-                Ok(Some(link)) => link.header.index,
-                Ok(None) => panic!(),
-                Err(_) => panic!(),
-            };
+        let does_addr_already_exists = self
+            .handle
+            .address()
+            .get()
+            .set_link_index_filter(bridge_index)
+            .set_address_filter(IpAddr::V4(addr))
+            .set_prefix_length_filter(prefix_len)
+            .execute()
+            .try_next()
+            .await;
+        if does_addr_already_exists.is_ok() {
+            info!("address {:?} already exists for bridge", addr);
 
-            let _ = self
-                .handle
-                .link()
-                .set(bridge_index)
-                .up()
-                .execute()
-                .await
-                .map_err(|_| Error::RequestFailed);
-        });
+            return Ok(());
+        }
+
+        info!(
+            "addr not found, set addr {} with mask {} for bridge",
+            addr, netmask
+        );
+        self.handle
+            .address()
+            .add(bridge_index, IpAddr::V4(addr), prefix_len)
+            .execute()
+            .await
+            .map_err(Error::AddAddress)
     }
 
-    pub fn attach_link(&self, link_name: String) {
-        futures::executor::block_on(async {
-            let mut link_names = self
-                .handle
-                .link()
-                .get()
-                .match_name(link_name.clone())
-                .execute();
-            let mut master_names = self
-                .handle
-                .link()
-                .get()
-                .match_name(self.name.clone())
-                .execute();
+    pub async fn attach_link(&self, link_name: String) -> Result<(), Error> {
+        let link_index = self.get_index_by_name(&link_name).await?;
+        let master_index = self.get_index_by_name(&self.name).await?;
 
-            let link_index = match link_names.try_next().await {
-                Ok(Some(link)) => link.header.index,
-                Ok(None) => panic!(),
-                Err(_) => panic!(),
-            };
-            let master_index = match master_names.try_next().await {
-                Ok(Some(link)) => link.header.index,
-                Ok(None) => panic!(),
-                Err(_) => panic!(),
-            };
+        self.handle
+            .link()
+            .set(link_index)
+            .controller(master_index)
+            .execute()
+            .await
+            .map_err(|err| Error::AttachLink {
+                link_name,
+                cause: err,
+            })
+    }
 
-            let _ = self
-                .handle
-                .link()
-                .set(link_index)
-                .controller(master_index)
-                .execute()
-                .await
-                .map_err(|_| Error::RequestFailed);
-        });
+    pub async fn set_up(&self) -> Result<(), Error> {
+        let bridge_index = self.get_index_by_name(&self.name).await?;
+
+        self.handle
+            .link()
+            .set(bridge_index)
+            .up()
+            .execute()
+            .await
+            .map_err(Error::SetStateAsUp)
     }
 }

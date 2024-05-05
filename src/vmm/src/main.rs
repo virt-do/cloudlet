@@ -45,6 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cli_args.netmask,
                 cli_args.iface_guest_addr,
             )
+            .await
             .map_err(VmmErrors::VmmNew)
             .unwrap();
 
@@ -54,6 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cli_args.kernel,
                 &cli_args.initramfs,
             )
+            .await
             .map_err(VmmErrors::VmmConfigure)
             .unwrap();
 
