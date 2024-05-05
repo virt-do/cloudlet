@@ -31,6 +31,9 @@ pub mod agent {
 // Implement the From trait for VmmErrors into Status
 impl From<VmmErrors> for Status {
     fn from(error: VmmErrors) -> Self {
+        // log the gRPC error before sending it
+        error!("VMM error: {:?}", error);
+
         // You can create a custom Status variant based on the error
         match error {
             VmmErrors::VmmNew(_) => Status::internal("Error creating VMM"),
