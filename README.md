@@ -22,14 +22,14 @@
 Install the dependencies. On Debian/Ubuntu:
 
 ```bash
-apt install build-essential cmake pkg-config libssl-dev flex bison libelf-dev
+apt install build-essential cmake pkg-config libssl-dev flex bison libelf-dev iptables
 ```
 
-Then, configure the Rust toolchain and install [Just](https://github.com/casey/just):
+Then, configure the Rust toolchain and install [Just](https://github.com/casey/just) (only for dev environment):
 
 ```bash
 rustup target add x86_64-unknown-linux-musl
-cargo install just
+cargo install just # optional
 ```
 
 Finally, install [the protobuf compiler](https://github.com/protocolbuffers/protobuf?tab=readme-ov-file#protobuf-compiler-installation).
