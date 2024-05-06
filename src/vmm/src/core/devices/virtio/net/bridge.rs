@@ -84,7 +84,7 @@ impl Bridge {
         let bridge_index = self.get_index_by_name(&self.name).await?;
         let prefix_len = xx_netmask_width(netmask.octets());
 
-        let does_addr_already_exists = self
+        let addr_get_request = self
             .handle
             .address()
             .get()
@@ -94,7 +94,7 @@ impl Bridge {
             .execute()
             .try_next()
             .await;
-        if does_addr_already_exists.is_ok() {
+        if let Ok(Some(_)) = addr_get_request {
             info!("address {:?} already exists for bridge", addr);
 
             return Ok(());
