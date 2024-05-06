@@ -212,9 +212,7 @@ impl VmmServiceTrait for VmmService {
 
         let initramfs_path = self.get_initramfs(&language, curr_dir.as_os_str())?;
 
-        let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP)
-            .await
-            .map_err(VmmErrors::VmmNew)?;
+        let mut vmm = VMM::new(HOST_IP, HOST_NETMASK, GUEST_IP).map_err(VmmErrors::VmmNew)?;
 
         // Configure the VMM parameters might need to be calculated rather than hardcoded
         vmm.configure(1, 4000, kernel_path, &Some(initramfs_path))

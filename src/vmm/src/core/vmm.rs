@@ -69,7 +69,7 @@ pub struct VMM {
 
 impl VMM {
     /// Create a new VMM.
-    pub async fn new(
+    pub fn new(
         iface_host_addr: Ipv4Addr,
         netmask: Ipv4Addr,
         iface_guest_addr: Ipv4Addr,
