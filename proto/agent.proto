@@ -26,10 +26,10 @@ message ExecuteResponse {
     DEBUG = 5;
   }
 
-  string stdout = 1;
-  string stderr = 2;
-  Stage stage = 3;
-  int32 exit_code = 4;
+  Stage stage = 1;
+  optional string stdout = 2;
+  optional string stderr = 3;
+  optional int32 exit_code = 4;
 }
 
 message SignalRequest {

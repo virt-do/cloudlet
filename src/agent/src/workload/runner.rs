@@ -7,7 +7,7 @@ use crate::{
 };
 use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc::Receiver, Mutex};
 
 #[cfg(feature = "debug-agent")]
 use crate::agents::debug;
@@ -28,7 +28,7 @@ impl Runner {
             Language::Debug => Box::new(debug::DebugAgent::from(config.clone())),
         };
 
-        Runner {
+        Self {
             config,
             agent,
             child_processes,
@@ -43,8 +43,8 @@ impl Runner {
         Ok(Self::new(config, child_processes))
     }
 
-    pub async fn run(&self) -> AgentResult<AgentOutput> {
-        let result = match self.config.action {
+    pub async fn run(&self) -> AgentResult<Receiver<AgentOutput>> {
+        let rx = match self.config.action {
             Action::Prepare => {
                 self.agent
                     .prepare(Arc::clone(&self.child_processes))
@@ -52,17 +52,16 @@ impl Runner {
             }
             Action::Run => self.agent.run(Arc::clone(&self.child_processes)).await?,
             Action::PrepareAndRun => {
-                let res = self
+                // should merge with run rx?
+                let _ = self
                     .agent
                     .prepare(Arc::clone(&self.child_processes))
                     .await?;
-                println!("Prepare result {:?}", res);
+
                 self.agent.run(Arc::clone(&self.child_processes)).await?
             }
         };
 
-        println!("Result: {:?}", result);
-
-        Ok(result)
+        Ok(rx)
     }
 }
