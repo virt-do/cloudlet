@@ -49,6 +49,10 @@ pub struct CliArgs {
     /// Allow invalid TLS certificates
     #[arg(long="insecure", action=ArgAction::SetTrue)]
     pub insecure: bool,
+
+    /// Disable the compression of the final image
+    #[arg(short, long, action=ArgAction::SetTrue)]
+    pub no_compression: bool,
 }
 
 impl CliArgs {

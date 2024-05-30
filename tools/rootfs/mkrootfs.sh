@@ -11,7 +11,7 @@ ulimit -Sn 8192
 
 if [ -d fs-gen ]
 then
-    cargo run --bin fs-gen -- $1 $2 -o $3
+    cargo run --bin fs-gen -- $1 $2 -o $3 --no-compression
 else
     echo "Module fs-gen not found"
 fi
