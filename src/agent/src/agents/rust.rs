@@ -1,4 +1,5 @@
 use super::{Agent, AgentOutput};
+use crate::agent::execute_response::Stage;
 use crate::agents::process_utils;
 use crate::{workload, AgentError, AgentResult};
 use async_trait::async_trait;
@@ -117,7 +118,10 @@ impl Agent for RustAgent {
 
         let (tx, rx) = mpsc::channel(10);
         tokio::spawn(async move {
-            let _ = process_utils::send_stderr_to_tx(child.stderr.take().unwrap(), tx.clone()).await.await;
+            let stderr = child.stderr.take().unwrap();
+            let _ = process_utils::send_stderr_to_tx(stderr, tx.clone(), Some(Stage::Building))
+                .await
+                .await;
             let build_result = process_utils::send_exit_status_to_tx(child, tx, false).await;
             // if error in build, short-circuit the execution
             if build_result.is_err() {
@@ -173,12 +177,16 @@ impl Agent for RustAgent {
         let tx_stderr = tx;
 
         tokio::spawn(async move {
-            let _ = process_utils::send_stdout_to_tx(child_stdout, tx_stdout.clone()).await.await;
+            let _ = process_utils::send_stdout_to_tx(child_stdout, tx_stdout.clone(), None)
+                .await
+                .await;
             let _ = process_utils::send_exit_status_to_tx(child, tx_stdout, true).await;
         });
 
         tokio::spawn(async move {
-            process_utils::send_stderr_to_tx(child_stderr, tx_stderr).await;
+            let _ = process_utils::send_stderr_to_tx(child_stderr, tx_stderr, None)
+                .await
+                .await;
         });
 
         Ok(rx)

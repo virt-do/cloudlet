@@ -91,6 +91,7 @@ mod process_utils {
     pub async fn send_stdout_to_tx(
         stdout: ChildStdout,
         tx: mpsc::Sender<AgentOutput>,
+        stage: Option<Stage>,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let reader = BufReader::new(stdout);
@@ -99,7 +100,7 @@ mod process_utils {
             while let Ok(Some(line)) = reader_lines.next_line().await {
                 let _ = tx
                     .send(AgentOutput {
-                        stage: Stage::Running,
+                        stage: stage.unwrap_or(Stage::Running),
                         stdout: Some(line),
                         stderr: None,
                         exit_code: None,
@@ -113,6 +114,7 @@ mod process_utils {
     pub async fn send_stderr_to_tx(
         stderr: ChildStderr,
         tx: mpsc::Sender<AgentOutput>,
+        stage: Option<Stage>,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let reader = BufReader::new(stderr);
@@ -121,7 +123,7 @@ mod process_utils {
             while let Ok(Some(line)) = reader_lines.next_line().await {
                 let _ = tx
                     .send(AgentOutput {
-                        stage: Stage::Running,
+                        stage: stage.unwrap_or(Stage::Running),
                         stdout: Some(line),
                         stderr: None,
                         exit_code: None,
