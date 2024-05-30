@@ -12,6 +12,7 @@ struct TomlConfig {
     workload_name: String,
     language: Language,
     action: String,
+    #[serde(default)]
     server: ServerConfig,
     build: BuildConfig,
 }

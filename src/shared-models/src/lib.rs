@@ -44,7 +44,7 @@ pub struct CloudletShutdownResponse {
     pub success: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct ServerConfig {
     pub address: String,
     pub port: u16,

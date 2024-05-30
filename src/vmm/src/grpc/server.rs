@@ -184,7 +184,7 @@ impl VmmServiceTrait for VmmService {
     }
 
     async fn run(&self, request: Request<RunVmmRequest>) -> Result<Self::RunStream> {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+        let (tx, rx) = tokio::sync::mpsc::channel(4);
 
         const HOST_IP: Ipv4Addr = Ipv4Addr::new(172, 29, 0, 1);
         const HOST_NETMASK: Ipv4Addr = Ipv4Addr::new(255, 255, 0, 0);
@@ -258,13 +258,12 @@ impl VmmServiceTrait for VmmService {
                         };
                         let _ = tx.send(Ok(vmm_response)).await;
                     }
+                    // once the execution is stopped, stop the agent
+                    let signal_request = ShutdownVmRequest {};
+                    let _ = client.shutdown(signal_request).await;
                 });
 
-                rx.close();
 
-                // once the execution is stopped, stop the agent
-                let signal_request = crate::grpc::client::agent::SignalRequest {};
-                let _ = client.signal(signal_request).await;
             }
             Err(e) => {
                 error!("ERROR {:?}", e);
