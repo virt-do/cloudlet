@@ -17,5 +17,10 @@ fn fibonacci(n: u32) -> u64 {
 
 fn main() {
     let n = 10;
-    println!("Fibonacci number at position {} is: {}", n, fibonacci(n));
+
+    for i in 0..=10 {
+        println!("🚀 Loop {}", i);
+        println!("Fibonacci number at position {} is: {}", n, fibonacci(n));
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    }
 }
