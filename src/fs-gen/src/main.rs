@@ -40,7 +40,11 @@ fn run(args: CliArgs) -> Result<()> {
     // building initramfs
     create_init_file(output_subdir, args.initfile_path)?;
     insert_agent(output_subdir, args.agent_host_path)?;
-    generate_initramfs(output_subdir, Path::new(args.output_file.as_path()))?;
+    generate_initramfs(
+        output_subdir,
+        Path::new(args.output_file.as_path()),
+        !args.no_compression,
+    )?;
 
     // cleanup of temporary directory
     remove_dir_all(args.temp_directory.clone())

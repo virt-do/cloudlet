@@ -49,7 +49,11 @@ pub fn insert_agent(destination: &Path, agent_path: PathBuf) -> Result<()> {
     Ok(())
 }
 
-pub fn generate_initramfs(root_directory: &Path, output: &Path) -> Result<()> {
+pub fn generate_initramfs(
+    root_directory: &Path,
+    output: &Path,
+    enable_compression: bool,
+) -> Result<()> {
     let file = File::create(output)
         .with_context(|| "Could not open output file to write initramfs".to_string())?;
     file.set_permissions(Permissions::from_mode(0o644))
@@ -57,11 +61,18 @@ pub fn generate_initramfs(root_directory: &Path, output: &Path) -> Result<()> {
 
     info!("Generating initramfs...");
 
+    let mut command_string: String =
+        "find . -print0 | cpio -0 --create --owner=root:root --format=newc".into();
+
+    if enable_compression {
+        command_string += " | xz -9 -T0 --format=lzma";
+    }
+
     let mut command = Command::new("sh")
         .current_dir(root_directory)
         .stdout(Stdio::from(file))
         .arg("-c")
-        .arg("find . -print0 | cpio -0 --create --owner=root:root --format=newc | xz -9 -T0 --format=lzma")
+        .arg(&command_string)
         .spawn()
         .with_context(|| "Failed to package initramfs into bundle".to_string())?;
 
