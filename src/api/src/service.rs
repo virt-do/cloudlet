@@ -1,5 +1,5 @@
 use crate::client::{
-    vmmorchestrator::{ExecuteResponse, RunVmmRequest, ShutdownVmRequest, ShutdownVmResponse},
+    vmmorchestrator::{execute_response::Stage, ExecuteResponse, RunVmmRequest, ShutdownVmRequest, ShutdownVmResponse},
     VmmClient,
 };
 use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
@@ -49,14 +49,39 @@ pub async fn run(req_body: web::Json<CloudletDtoRequest>) -> impl Responder {
 
 #[derive(Debug, Serialize)]
 pub struct ExecuteJsonResponse {
-    pub stdout: String,
-    pub stderr: String,
-    pub exit_code: i32,
+    pub stage: StageJson,
+    pub stdout: Option<String>,
+    pub stderr: Option<String>,
+    pub exit_code: Option<i32>,
+}
+
+#[derive(Debug, Serialize)]
+pub enum StageJson {
+    Pending,
+    Building,
+    Running,
+    Done,
+    Failed,
+    Debug,
+}
+
+impl From<Stage> for StageJson {
+    fn from(value: Stage) -> Self {
+        match value {
+            Stage::Pending => StageJson::Pending,
+            Stage::Building => StageJson::Building,
+            Stage::Running => StageJson::Running,
+            Stage::Done => StageJson::Done,
+            Stage::Failed => StageJson::Failed,
+            Stage::Debug => StageJson::Debug,
+        }
+    }
 }
 
 impl From<ExecuteResponse> for ExecuteJsonResponse {
     fn from(value: ExecuteResponse) -> Self {
         Self {
+            stage: Stage::from_i32(value.stage).unwrap().into(),
             stdout: value.stdout,
             stderr: value.stderr,
             exit_code: value.exit_code,
