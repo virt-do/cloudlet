@@ -1,5 +1,8 @@
 use crate::client::{
-    vmmorchestrator::{execute_response::Stage, ExecuteResponse, RunVmmRequest, ShutdownVmRequest, ShutdownVmResponse},
+    vmmorchestrator::{
+        execute_response::Stage, ExecuteResponse, RunVmmRequest, ShutdownVmRequest,
+        ShutdownVmResponse,
+    },
     VmmClient,
 };
 use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
