@@ -23,14 +23,14 @@ impl WorkloadRunner for WorkloadRunnerService {
         let runner = Runner::new_from_execute_request(req.into_inner(), CHILD_PROCESSES.clone())
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
-        let mut run_rx = runner
+        let mut runner_rx = runner
             .run()
             .await
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
         tokio::spawn(async move {
-            while let Some(agent_output) = run_rx.recv().await {
+            while let Some(agent_output) = runner_rx.recv().await {
                 println!("Sending to the gRPC client: {:?}", agent_output);
                 let _ = tx.send(Ok(agent_output.into())).await;
             }

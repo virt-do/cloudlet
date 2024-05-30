@@ -84,17 +84,19 @@ mod process_utils {
         io::{AsyncBufReadExt, BufReader},
         process::{ChildStderr, ChildStdout},
         sync::mpsc,
+        task::JoinHandle,
     };
 
     /// Spawn a tokio thread and send each line of `stdout`` to the `tx` given as a parameter.
-    pub async fn send_stdout_to_tx(stdout: ChildStdout, tx: mpsc::Sender<AgentOutput>) {
+    pub async fn send_stdout_to_tx(
+        stdout: ChildStdout,
+        tx: mpsc::Sender<AgentOutput>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let reader = BufReader::new(stdout);
             let mut reader_lines = reader.lines();
 
             while let Ok(Some(line)) = reader_lines.next_line().await {
-                println!("Got line from stdout: {:?}", line);
-
                 let _ = tx
                     .send(AgentOutput {
                         stage: Stage::Running,
@@ -104,18 +106,19 @@ mod process_utils {
                     })
                     .await;
             }
-        });
+        })
     }
 
     /// Same as [`send_stdout_to_tx`].
-    pub async fn send_stderr_to_tx(stderr: ChildStderr, tx: mpsc::Sender<AgentOutput>) {
+    pub async fn send_stderr_to_tx(
+        stderr: ChildStderr,
+        tx: mpsc::Sender<AgentOutput>,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
             let reader = BufReader::new(stderr);
             let mut reader_lines = reader.lines();
 
             while let Ok(Some(line)) = reader_lines.next_line().await {
-                println!("Got line from stderr: {:?}", line);
-
                 let _ = tx
                     .send(AgentOutput {
                         stage: Stage::Running,
@@ -125,28 +128,44 @@ mod process_utils {
                     })
                     .await;
             }
-        });
+        })
     }
 
     /// Function to wait for the `child` to finish and send the result to the `tx` given as a parameter.
     pub async fn send_exit_status_to_tx(
-        child: &mut tokio::process::Child,
+        mut child: tokio::process::Child,
         tx: mpsc::Sender<AgentOutput>,
+        send_done: bool,
     ) -> Result<(), ()> {
-        let exit_status = child.wait().await;
+        let exit_status = child.wait().await.map(|status| status.code());
 
         match exit_status {
-            Ok(code) => {
-                let _ = tx
-                    .send(AgentOutput {
-                        stage: Stage::Done,
-                        stdout: None,
-                        stderr: None,
-                        exit_code: code.code(),
-                    })
-                    .await;
+            Ok(exit_code) => {
+                if exit_code != Some(0_i32) {
+                    let _ = tx
+                        .send(AgentOutput {
+                            stage: Stage::Failed,
+                            stdout: None,
+                            stderr: None,
+                            exit_code,
+                        })
+                        .await;
 
-                Ok(())
+                    Err(())
+                } else {
+                    if send_done {
+                        let _ = tx
+                            .send(AgentOutput {
+                                stage: Stage::Done,
+                                stdout: None,
+                                stderr: None,
+                                exit_code,
+                            })
+                            .await;
+                    }
+
+                    Ok(())
+                }
             }
             Err(e) => {
                 let _ = tx

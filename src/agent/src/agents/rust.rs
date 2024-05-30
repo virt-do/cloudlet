@@ -115,25 +115,29 @@ impl Agent for RustAgent {
         let is_release = self.rust_config.build.release;
         let tx_build_notifier = self.build_notifier.clone();
 
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
         tokio::spawn(async move {
-            process_utils::send_stderr_to_tx(child.stderr.take().unwrap(), tx.clone()).await;
-            let build_result = process_utils::send_exit_status_to_tx(&mut child, tx).await;
+            let _ = process_utils::send_stderr_to_tx(child.stderr.take().unwrap(), tx.clone()).await.await;
+            let build_result = process_utils::send_exit_status_to_tx(child, tx, false).await;
+            // if error in build, short-circuit the execution
+            if build_result.is_err() {
+                let _ = tx_build_notifier.send(Err(()));
+            } else {
+                // Once finished: copy the binary to /tmp
+                // We could imagine a more complex scenario where we would put this in an artifact repository (like S3)
+                let binary_path = match is_release {
+                    true => format!("{}/target/release/{}", &function_dir, workload_name),
+                    false => format!("{}/target/debug/{}", &function_dir, workload_name),
+                };
 
-            // Once finished: copy the binary to /tmp
-            // We could imagine a more complex scenario where we would put this in an artifact repository (like S3)
-            let binary_path = match is_release {
-                true => format!("{}/target/release/{}", &function_dir, workload_name),
-                false => format!("{}/target/debug/{}", &function_dir, workload_name),
-            };
+                std::fs::copy(binary_path, format!("/tmp/{}", workload_name))
+                    .expect("Unable to copy binary");
 
-            std::fs::copy(binary_path, format!("/tmp/{}", workload_name))
-                .expect("Unable to copy binary");
+                // notify when build is done
+                let _ = tx_build_notifier.send(build_result);
+            }
 
             std::fs::remove_dir_all(&function_dir).expect("Unable to remove directory");
-
-            // notify when build is done
-            let _ = tx_build_notifier.send(build_result);
         });
 
         Ok(rx)
@@ -151,6 +155,7 @@ impl Agent for RustAgent {
             .map_err(|_| AgentError::BuildNotifier)?
             .map_err(|_| AgentError::BuildFailed)?;
 
+        println!("Starting run()");
         let mut child = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -161,15 +166,15 @@ impl Agent for RustAgent {
             child_processes.lock().await.insert(child.id().unwrap());
         }
 
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
         let child_stdout = child.stdout.take().unwrap();
         let tx_stdout = tx.clone();
         let child_stderr = child.stderr.take().unwrap();
         let tx_stderr = tx;
 
         tokio::spawn(async move {
-            process_utils::send_stdout_to_tx(child_stdout, tx_stdout.clone()).await;
-            let _ = process_utils::send_exit_status_to_tx(&mut child, tx_stdout).await;
+            let _ = process_utils::send_stdout_to_tx(child_stdout, tx_stdout.clone()).await.await;
+            let _ = process_utils::send_exit_status_to_tx(child, tx_stdout, true).await;
         });
 
         tokio::spawn(async move {

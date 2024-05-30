@@ -43,7 +43,7 @@ impl Runner {
         Ok(Self::new(config, child_processes))
     }
 
-    pub async fn run(&self) -> AgentResult<Receiver<AgentOutput>> {
+    pub async fn run(self) -> AgentResult<Receiver<AgentOutput>> {
         let rx = match self.config.action {
             Action::Prepare => {
                 self.agent
@@ -52,13 +52,30 @@ impl Runner {
             }
             Action::Run => self.agent.run(Arc::clone(&self.child_processes)).await?,
             Action::PrepareAndRun => {
-                // should merge with run rx?
-                let _ = self
+                let (tx1, rx) = tokio::sync::mpsc::channel::<AgentOutput>(10);
+                let tx2 = tx1.clone();
+
+                // Merges the two receivers given as parameters and returns only one
+                let mut rx_prepare = self
                     .agent
                     .prepare(Arc::clone(&self.child_processes))
                     .await?;
+                tokio::spawn(async move {
+                    while let Some(output) = rx_prepare.recv().await {
+                        let _ = tx1.send(output).await;
+                    }
+                });
 
-                self.agent.run(Arc::clone(&self.child_processes)).await?
+                tokio::spawn(async move {
+                    let rx_run = self.agent.run(Arc::clone(&self.child_processes)).await;
+                    if let Ok(mut rx_run) = rx_run {
+                        while let Some(output) = rx_run.recv().await {
+                            let _ = tx2.clone().send(output).await;
+                        }
+                    }
+                });
+
+                rx
             }
         };
 
