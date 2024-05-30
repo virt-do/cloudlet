@@ -1,10 +1,10 @@
 use super::runner::Runner;
-use crate::agent::{self, execute_response::Stage, ExecuteRequest, ExecuteResponse, SignalRequest};
+use crate::agent::{self, ExecuteRequest, ExecuteResponse, SignalRequest};
 use agent::workload_runner_server::WorkloadRunner;
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::{process, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
 
@@ -20,30 +20,21 @@ impl WorkloadRunner for WorkloadRunnerService {
     type ExecuteStream = ReceiverStream<std::result::Result<ExecuteResponse, tonic::Status>>;
 
     async fn execute(&self, req: Request<ExecuteRequest>) -> Result<Self::ExecuteStream> {
-        let (tx, rx) = tokio::sync::mpsc::channel(4);
-
-        let execute_request = req.into_inner();
-
-        let runner = Runner::new_from_execute_request(execute_request, CHILD_PROCESSES.clone())
+        let runner = Runner::new_from_execute_request(req.into_inner(), CHILD_PROCESSES.clone())
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
-        let res = runner
+        let mut runner_rx = runner
             .run()
             .await
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
-        let _ = tx
-            .send(Ok(ExecuteResponse {
-                stage: Stage::Done as i32,
-                stdout: res.stdout,
-                stderr: res.stderr,
-                exit_code: res.exit_code,
-            }))
-            .await
-            .map_err(|e| {
-                println!("Failed to send response: {:?}", e);
-                tonic::Status::internal("Failed to send response")
-            })?;
+        let (tx, rx) = mpsc::channel(10);
+        tokio::spawn(async move {
+            while let Some(agent_output) = runner_rx.recv().await {
+                println!("Sending to the gRPC client: {:?}", agent_output);
+                let _ = tx.send(Ok(agent_output.into())).await;
+            }
+        });
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }
