@@ -262,8 +262,6 @@ impl VmmServiceTrait for VmmService {
                     let signal_request = ShutdownVmRequest {};
                     let _ = client.shutdown(signal_request).await;
                 });
-
-
             }
             Err(e) => {
                 error!("ERROR {:?}", e);
