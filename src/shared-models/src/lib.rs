@@ -44,10 +44,20 @@ pub struct CloudletShutdownResponse {
     pub success: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ServerConfig {
     pub address: String,
     pub port: u16,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        ServerConfig {
+            address: String::from("localhost"),
+            port: 50051
+        }
+
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
