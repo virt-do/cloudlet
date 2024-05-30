@@ -248,15 +248,17 @@ impl VmmServiceTrait for VmmService {
                 let mut response_stream = client.execute(agent_request).await?;
 
                 // Process each message as it arrives
-                while let Some(response) = response_stream.message().await? {
-                    let vmm_response = vmmorchestrator::ExecuteResponse {
-                        stage: response.stage,
-                        stdout: response.stdout,
-                        stderr: response.stderr,
-                        exit_code: response.exit_code,
-                    };
-                    tx.send(Ok(vmm_response)).await.unwrap();
-                }
+                tokio::spawn(async move {
+                    while let Ok(Some(response)) = response_stream.message().await {
+                        let vmm_response = vmmorchestrator::ExecuteResponse {
+                            stage: response.stage,
+                            stdout: response.stdout,
+                            stderr: response.stderr,
+                            exit_code: response.exit_code,
+                        };
+                        let _ = tx.send(Ok(vmm_response)).await;
+                    }
+                });
             }
             Err(e) => {
                 error!("ERROR {:?}", e);
