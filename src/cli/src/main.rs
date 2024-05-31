@@ -1,49 +1,20 @@
 use clap::Parser;
-
-use args::{CliArgs, Commands};
-
-use services::CloudletClient;
-use std::{fs, io, process::exit};
-
-mod args;
-mod services;
-mod utils;
+use cli::args::CliArgs;
+use std::process::exit;
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
+async fn main() {
     let args = CliArgs::parse();
 
-    match args.command {
-        Commands::Run { config_path } => {
-            let toml_file = match fs::read_to_string(config_path.clone()) {
-                Ok(c) => c,
-                Err(_) => {
-                    eprintln!("Could not read file `{:?}`", config_path);
-                    exit(1);
-                }
-            };
-            let body = CloudletClient::new_cloudlet_config(toml_file);
-            let response = CloudletClient::run(body).await;
+    let api_url = std::env::var("API_URL").unwrap_or("localhost:3000".into());
+    let api_url = format!("http://{api_url}");
 
-            match response {
-                Ok(_) => println!("Request successful {:?}", response),
-                Err(e) => eprintln!("Error while making the request: {}", e),
-            }
-        }
-        Commands::Shutdown {} => {
-            let response = CloudletClient::shutdown().await;
-            match response {
-                Ok(bool) => {
-                    if bool {
-                        println!("Shutdown Request successful !")
-                    } else {
-                        println!("Shutdown Request Failed")
-                    }
-                }
-                Err(()) => println!("Cannot send shutdown Request"),
-            }
+    let result = cli::run_cli(&api_url, args).await;
+    match result {
+        Ok(exit_code) => exit(exit_code),
+        Err(e) => {
+            eprintln!("Could not execute the command:\n{:?}", e);
+            exit(1);
         }
     }
-
-    Ok(())
 }

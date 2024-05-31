@@ -14,5 +14,5 @@ pub enum Commands {
         #[arg(short, long)]
         config_path: PathBuf,
     },
-    Shutdown {},
+    Shutdown,
 }
