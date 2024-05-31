@@ -1,4 +1,0 @@
-language: rust
-env_path: /home/thomas/Desktop/fork/cloudlet/src/cli/config/example.env
-code_path: /home/thomas/Desktop/fork/cloudlet/src/cli/src/main.rs
-log_level: debug

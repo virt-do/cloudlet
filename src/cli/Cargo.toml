@@ -3,15 +3,14 @@ name = "cli"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-clap = { version = "4.5.3", features = ["derive"] }
-toml = "0.8.12"
-tokio = { version = "1.36.0", features = ["full"] }
-serde = { version = "1.0.197", features = ["derive"] }
-serde_yaml = "0.9.34"
-schemars = "0.8.16"
-serde_json = "1.0.115"
-reqwest = "0.12.3"
-shared_models = { path="../shared-models" }
+clap = { version = "4.5", features = ["derive"] }
+crossterm = "0.27"
+futures = "0.3"
+reqwest = { version = "0.12", features = ["json"] }
+reqwest-eventsource = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+shared_models = { path = "../shared-models" }
+tokio = { version = "1.38", features = ["full"] }
+toml = "0.8"
